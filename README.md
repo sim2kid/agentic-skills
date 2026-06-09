@@ -25,7 +25,7 @@ packages/
 
 - **`sub-agents/`**: Contains specialized agents with their own `AGENT.md` definition.
 - **`skills/`**: Contains modular skills, each in its own directory with a `SKILL.md` file.
-- **`package-info.json`**: Stores metadata (name, description, dependencies) for the package.
+- **`package-info.json`**: Stores metadata (id, name, description, dependencies) for the package.
 
 All definitions follow the [OpenCode](https://opencode.ai/docs/) standards for skills and agents.
 

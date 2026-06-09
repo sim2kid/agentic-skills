@@ -39,7 +39,7 @@ The repository is organized into a modular package-based system:
         - **`skills/`**: Contains modular skills.
             - **`<skill-name>/`**: Individual skill folder.
                 - **`SKILL.md`**: The skill definition following the OpenCode format.
-        - **`package-info.json`**: Name, description, and dependencies for the package.
+        - **`package-info.json`**: ID, name, description, and dependencies for the package.
 
 ## Refinement & Evolution
 
