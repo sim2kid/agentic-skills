@@ -50,6 +50,7 @@ To ensure these agents work effectively together, we are implementing:
 2.  **Conflict Resolution**: The "Triad" protocol handles disagreements between Product, Technical, and UX leads.
 3.  **Standardized Lifecycles**: A clear path from issue intake to implementation and validation.
 4.  **Modular Skill System**: Skills are treated as context chips to prevent context pollution and maintain agent focus.
+5.  **Automated Installation**: A dedicated script for deploying skills and agents into target repositories (see [Install Script Design](install-script.md)).
 
 ---
 *This document is a living design record and will be updated as the project evolves.*
