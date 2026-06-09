@@ -27,6 +27,20 @@ The project follows a standardized studio roster to leverage industry-standard b
 - **DevOps Specialist**: Manages deployment, environments, and scalability.
 - **Security Auditor**: Conducts passive reviews for vulnerabilities and licensing compliance.
 
+## Repository Structure
+
+The repository is organized into a modular package-based system:
+
+- **`packages/`**: The root directory for all agentic packages.
+    - **`<package-name>/`**: A specific package (e.g., `core`, `unity-dev`).
+        - **`sub-agents/`**: Contains specialized agents.
+            - **`<agent-name>/`**: Individual agent folder.
+                - **`AGENT.md`**: The agent definition following the OpenCode format.
+        - **`skills/`**: Contains modular skills.
+            - **`<skill-name>/`**: Individual skill folder.
+                - **`SKILL.md`**: The skill definition following the OpenCode format.
+        - **`package-info.json`**: Name, description, and dependencies for the package.
+
 ## Refinement & Evolution
 
 To ensure these agents work effectively together, we are implementing:

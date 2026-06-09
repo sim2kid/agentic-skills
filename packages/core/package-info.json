@@ -1,0 +1,5 @@
+{
+  "name": "core",
+  "description": "The base package containing essential sub-agents and skills for the software studio.",
+  "dependencies": []
+}

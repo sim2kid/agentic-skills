@@ -7,7 +7,27 @@ This repository serves as a centralized hub for defining and distributing OpenCo
 The project utilizes OpenCode's [Agent Skills](https://opencode.ai/docs/skills/) and [Subagents](https://opencode.ai/docs/agents/#subagents) to provide extensible software engineering capabilities.
 
 ### Package Management
-Available packages are defined in `packages.json` and organized within the corresponding file structure. Each package contains the necessary skill definitions and agent configurations.
+
+This repository uses a structured, package-based organization to manage agents and skills.
+
+#### Folder Structure
+```text
+packages/
+└── <package-name>/
+    ├── sub-agents/
+    │   └── <agent-name>/
+    │       └── AGENT.md
+    ├── skills/
+    │   └── <skill-name>/
+    │       └── SKILL.md
+    └── package-info.json
+```
+
+- **`sub-agents/`**: Contains specialized agents with their own `AGENT.md` definition.
+- **`skills/`**: Contains modular skills, each in its own directory with a `SKILL.md` file.
+- **`package-info.json`**: Stores metadata (name, description, dependencies) for the package.
+
+All definitions follow the [OpenCode](https://opencode.ai/docs/) standards for skills and agents.
 
 ## Installation
 

@@ -2,6 +2,21 @@
 
 To prevent "context pollution," skills are treated as modular context chips injected into an agent's prompt only when relevant to the current task.
 
+## OpenCode Compliance
+
+All skills in this repository follow the [OpenCode Skill Format](https://opencode.ai/docs/skills/). 
+
+### Skill Structure
+Each skill is contained within its own directory under a package's `skills/` folder:
+```
+packages/<package-name>/skills/<skill-name>/
+└── SKILL.md
+```
+
+### `SKILL.md` Requirements
+- **Frontmatter**: Must include `name` and `description`.
+- **Content**: Detailed instructions and constraints for the specific skill.
+
 ## Shared Skills
 *Available to all agents in the studio.*
 

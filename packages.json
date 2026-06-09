@@ -1,14 +1,10 @@
 {
   "packages": [
     {
-      "id": "example-skill",
-      "type": "skill",
-      "description": "An example skill for OpenCode"
-    },
-    {
-      "id": "example-agent",
-      "type": "agent",
-      "description": "An example agent for OpenCode"
+      "id": "core",
+      "name": "Core Package",
+      "description": "The base package containing essential sub-agents and skills for the software studio.",
+      "path": "packages/core"
     }
   ]
 }
