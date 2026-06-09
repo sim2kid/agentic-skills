@@ -41,6 +41,8 @@ The repository is organized into a modular package-based system:
                 - **`SKILL.md`**: The skill definition following the OpenCode format.
         - **`package-info.json`**: ID, name, description, and dependencies for the package.
 
+> **Note**: During the build process, the root-level `packages.json` is automatically populated using data from each package's `package-info.json`. This ensures metadata is maintained in a single location per package.
+
 ## Refinement & Evolution
 
 To ensure these agents work effectively together, we are implementing:
