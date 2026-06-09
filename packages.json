@@ -1,0 +1,14 @@
+{
+  "packages": [
+    {
+      "id": "example-skill",
+      "type": "skill",
+      "description": "An example skill for OpenCode"
+    },
+    {
+      "id": "example-agent",
+      "type": "agent",
+      "description": "An example agent for OpenCode"
+    }
+  ]
+}
