@@ -13,6 +13,10 @@ function Get-State {
 }
 
 function Save-State ($state) {
+    $stateDir = Split-Path $stateFile -Parent
+    if (-not (Test-Path -LiteralPath $stateDir)) {
+        New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+    }
     $state | ConvertTo-Json | Set-Content -LiteralPath $stateFile
 }
 
