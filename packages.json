@@ -1,10 +1,9 @@
 {
   "packages": [
     {
-      "id": "core",
-      "name": "Core Package",
-      "description": "The base package containing essential sub-agents and skills for the software studio.",
-      "path": "packages/core"
+      "id": "example-pkg",
+      "description": "Example package containing both skill and agent",
+      "dependencies": []
     }
   ]
 }

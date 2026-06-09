@@ -43,8 +43,8 @@ To support updates and clean removals, the script will maintain a state file in 
     - Extract selected packages to a temporary location.
 3.  **File Placement (Agent-Type Specific)**:
     - For **OpenCode**:
-        - **Skills**: Move to `.opencode/skills/<package-name>/` (following `SKILL.md` format).
-        - **Subagents**: Move to `.opencode/agents/<package-name>.md` (and any associated config files).
+        - **Skills**: Each skill folder under `packages/<package-name>/skills/` is deployed to `.opencode/skills/<skill-name>/`.
+        - **Subagents**: Each `AGENT.md` file under `packages/<package-name>/sub-agents/<agent-name>/` is renamed and deployed to `.opencode/agents/<agent-name>.md`. (Including any associated config files from the agent directory).
 4.  **Finalize State**:
     - Update/Create `packages-installed.json` with the new version and the list of currently installed packages.
 
@@ -69,5 +69,5 @@ As per OpenCode documentation:
 - [ ] Successfully downloads and runs via a single PowerShell command.
 - [ ] Correctly identifies and auto-selects previously installed packages.
 - [ ] Removes old files before installing new ones to prevent "ghost" files.
-- [ ] Successfully deploys skills and subagents into the correct `.opencode/` structure.
+- [ ] Successfully deploys skills and subagents into the correct `.opencode/` structure (maintaining individual skill folders and renaming `AGENT.md` files).
 - [ ] Correctly updates the `packages-installed.json` file.

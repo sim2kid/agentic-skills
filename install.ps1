@@ -3,7 +3,7 @@
 
 $repoOwner = "anomalyco"
 $repoName = "agentic-skills"
-$stateFile = "packages-installed.json"
+$stateFile = ".agents/agent-packages-installed.json"
 
 function Get-State {
     if (Test-Path -LiteralPath $stateFile) {
@@ -140,27 +140,41 @@ function Deploy-Packages ($version, $selectedPackages, $metadata) {
     }
 
     foreach ($pkgId in $selectedPackages) {
-        $pkg = $metadata.packages | Where-Object { $_.id -eq $pkgId }
-        if (-not $pkg) {
-            Write-Warning "Package $pkgId not found in metadata. Skipping."
+        Write-Host "Installing package $($pkgId)..." -ForegroundColor Cyan
+        $pkgDir = Join-Path $sourceRoot "packages/$pkgId"
+        if (-not (Test-Path -LiteralPath $pkgDir)) {
+            Write-Warning "Package directory $pkgDir not found. Skipping."
             continue
         }
 
-        Write-Host "Installing $($pkg.id)..." -ForegroundColor Cyan
-        
-        if ($pkg.type -eq "skill") {
-            $dest = ".opencode/skills/$pkgId"
-            New-Item -ItemType Directory -Path $dest -Force | Out-Null
-            $src = Join-Path $sourceRoot "skills/$pkgId"
-            if (Test-Path -LiteralPath $src) {
-                Copy-Item -Path "$src\*" -Destination $dest -Recurse -Force
+        # Install Skills from the package
+        $skillsSrc = Join-Path $pkgDir "skills"
+        if (Test-Path -LiteralPath $skillsSrc) {
+            $skillsDestBase = ".opencode/skills"
+            New-Item -ItemType Directory -Path $skillsDestBase -Force | Out-Null
+            $installedSkills = Get-ChildItem -Path $skillsSrc -Directory
+            foreach ($skill in $installedSkills) {
+                $skillDest = Join-Path $skillsDestBase $skill.Name
+                New-Item -ItemType Directory -Path $skillDest -Force | Out-Null
+                Copy-Item -Path "$($skill.FullName)\*" -Destination $skillDest -Recurse -Force
+                Write-Host "  -> Installed skill: $($skill.Name)" -ForegroundColor Gray
             }
-        } elseif ($pkg.type -eq "agent") {
-            $destDir = ".opencode/agents"
-            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-            $src = Join-Path $sourceRoot "agents/$pkgId.md"
-            if (Test-Path -LiteralPath $src) {
-                Copy-Item -Path $src -Destination (Join-Path $destDir "$pkgId.md") -Force
+        }
+
+        # Install Sub-Agents from the package
+        $agentsSrc = Join-Path $pkgDir "sub-agents"
+        if (Test-Path -LiteralPath $agentsSrc) {
+            $agentsDestBase = ".opencode/agents"
+            New-Item -ItemType Directory -Path $agentsDestBase -Force | Out-Null
+            $installedAgents = Get-ChildItem -Path $agentsSrc -Directory
+            foreach ($agent in $installedAgents) {
+                $agentDest = Join-Path $agentsDestBase "$($agent.Name).md"
+                # The requirement says sub-agents folder contains agent name folder and then AGENT.md
+                $agentFile = Join-Path $agent.FullName "AGENT.md"
+                if (Test-Path -LiteralPath $agentFile) {
+                    Copy-Item -Path $agentFile -Destination $agentDest -Force
+                    Write-Host "  -> Installed agent: $($agent.Name)" -ForegroundColor Gray
+                }
             }
         }
     }
