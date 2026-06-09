@@ -18,10 +18,9 @@ A dedicated install script is provided to deploy these skills into target reposi
 - Support for upgrades and rollbacks based on git releases.
 - Cross-device compatibility.
 
-Run the installation script:
-```bash
-# Example installation command
-./install.sh
+Run the installation command (Windows):
+```powershell
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex"
 ```
 
 ## Testing & Validation
