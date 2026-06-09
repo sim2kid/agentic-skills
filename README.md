@@ -40,7 +40,7 @@ A dedicated install script is provided to deploy these skills into target reposi
 
 Run the installation command (Windows):
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/OWNER/REPO/main/install-scripts/windows/install.ps1 | iex"
 ```
 
 ## Testing & Validation

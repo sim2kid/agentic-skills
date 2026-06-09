@@ -190,6 +190,30 @@ function Deploy-Packages ($version, $selectedPackages, $metadata) {
 
 # Main Execution
 Show-Welcome
+$state = Get-State
+$currentVersion = if ($state) { $state.version } else { "None" }
+Write-Host "Current Installed Version: $currentVersion" -ForegroundColor Gray
+
+Write-Host "`nWhat would you like to do?" -ForegroundColor Yellow
+Write-Host "[0] Install / Update"
+Write-Host "[1] Uninstall"
+$action = Read-Host "Enter choice (default 0)"
+if ([string]::IsNullOrWhiteSpace($action)) { $action = 0 }
+
+if ($action -eq 1) {
+    Write-Host "`nUninstalling all installed packages..." -ForegroundColor Yellow
+    if ($state -and $state.packages) {
+        if (Test-Path -LiteralPath ".opencode") {
+            Remove-Item -Recurse -Force ".opencode"
+        }
+        Remove-Item -LiteralPath $stateFile -Force -ErrorAction SilentlyContinue
+        Write-Host "Successfully uninstalled all packages." -ForegroundColor Green
+    } else {
+        Write-Host "No packages were installed." -ForegroundColor Gray
+    }
+    exit
+}
+
 $agentType = Select-AgentType
 $version = Select-Version
 $metadata = Get-PackageMetadata $version
