@@ -32,6 +32,7 @@ internal sealed class InstallerApp
     private int _agentTypeIndex;
     private int _versionIndex;
     private int _packagePageIndex;
+    private string? _focusedPackageId;
 
     public void Run()
     {
@@ -329,6 +330,7 @@ internal sealed class InstallerApp
         _packagePageIndex = Math.Clamp(_packagePageIndex, 0, totalPages - 1);
         var startIndex = _packagePageIndex * PackagePageSize;
         var pagePackages = _availablePackages.Skip(startIndex).Take(PackagePageSize).ToList();
+        var restoreFocusId = _focusedPackageId;
 
         var descriptionView = new TextView
         {
@@ -397,8 +399,19 @@ internal sealed class InstallerApp
 
         if (packageRows.Count > 0)
         {
-            UpdateDescription(descriptionView, pagePackages[0]);
-            packageRows[0].Toggle.SetFocus();
+            var focusIndex = 0;
+            if (!string.IsNullOrWhiteSpace(restoreFocusId))
+            {
+                var matchedIndex = pagePackages.FindIndex(pkg => string.Equals(pkg.Id, restoreFocusId, StringComparison.OrdinalIgnoreCase));
+                if (matchedIndex >= 0)
+                {
+                    focusIndex = matchedIndex;
+                }
+            }
+
+            _focusedPackageId = pagePackages[focusIndex].Id;
+            UpdateDescription(descriptionView, pagePackages[focusIndex]);
+            packageRows[focusIndex].Toggle.SetFocus();
         }
     }
 
@@ -417,12 +430,14 @@ internal sealed class InstallerApp
             if (args.KeyEvent.Key == Key.Enter || args.KeyEvent.Key == Key.Space)
             {
                 args.Handled = true;
+                _focusedPackageId = package.Id;
                 TogglePackage(package.Id);
                 RenderPackagesPage();
             }
         };
         toggle.MouseClick += _ =>
         {
+            _focusedPackageId = package.Id;
             UpdateDescription(descriptionView, package);
             TogglePackage(package.Id);
             RenderPackagesPage();
@@ -695,9 +710,14 @@ internal sealed class InstallerApp
             return $"[!] Required by {string.Join(", ", forcedBy.OrderBy(x => x))}";
         }
 
-        if (_selectedPackages.Contains(packageId))
+        if (_selectedPackages.Contains(packageId) && _manuallySelectedPackages.Contains(packageId))
         {
             return "[X] Selected";
+        }
+
+        if (_selectedPackages.Contains(packageId))
+        {
+            return "[X] Selected by dependency";
         }
 
         return "[ ] Optional";
