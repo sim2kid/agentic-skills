@@ -1,4 +1,6 @@
+using System.Collections;
 using System.Text.Json;
+using NStack;
 using Terminal.Gui;
 
 var installer = new InstallerApp();
@@ -14,119 +16,436 @@ internal sealed class InstallerApp
     private readonly HttpClient _httpClient = new();
     private readonly string _workspaceRoot = Environment.CurrentDirectory;
 
-    private string _agentType = DefaultAgentType;
+    private Window? _window;
+    private FrameView? _infoFrame;
+    private FrameView? _contentFrame;
+    private string _selectedAgentType = DefaultAgentType;
     private string _selectedVersion = "latest";
+    private List<string> _selectedPackages = new();
+    private List<PackageDefinition> _availablePackages = new();
+    private int _agentTypeIndex;
+    private int _versionIndex;
 
     public void Run()
     {
+        Console.CancelKeyPress += HandleCancelKeyPress;
         Application.Init();
 
         try
         {
+            BuildShell();
             ShowMainMenu();
             Application.Run();
         }
         finally
         {
+            Console.CancelKeyPress -= HandleCancelKeyPress;
             Application.Shutdown();
             _httpClient.Dispose();
+        }
+    }
+
+    private static void HandleCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
+    {
+        e.Cancel = true;
+        Application.RequestStop();
+    }
+
+    private void BuildShell()
+    {
+        _window = new Window("Agentic Skills Installer")
+        {
+            X = Pos.Center(),
+            Y = Pos.Center(),
+            Width = 100,
+            Height = 30
+        };
+
+        _window.KeyPress += HandleGlobalKeyPress;
+
+        _infoFrame = new FrameView("Info")
+        {
+            X = 1,
+            Y = 0,
+            Width = Dim.Fill() - 2,
+            Height = 5,
+            CanFocus = false
+        };
+
+        _contentFrame = new FrameView()
+        {
+            X = 1,
+            Y = Pos.Bottom(_infoFrame),
+            Width = Dim.Fill() - 2,
+            Height = Dim.Fill() - 1
+        };
+
+        _window.Add(_infoFrame, _contentFrame);
+        Application.Top.RemoveAll();
+        Application.Top.Add(_window);
+    }
+
+    private void HandleGlobalKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == (Key.CtrlMask | Key.C))
+        {
+            args.Handled = true;
+            Application.RequestStop();
+        }
+    }
+
+    private void UpdateInfoFrame()
+    {
+        if (_infoFrame is null)
+        {
+            return;
+        }
+
+        _infoFrame.RemoveAll();
+        var state = LoadState();
+        _infoFrame.Add(new Label(2, 0, $"Installed Version: {state?.Version ?? "None"}"));
+        _infoFrame.Add(new Label(40, 0, $"Installed Agent Type: {state?.AgentType ?? "None"}"));
+        _infoFrame.Add(new Label(2, 1, $"Selected Agent Type: {_selectedAgentType}"));
+        _infoFrame.Add(new Label(40, 1, $"Selected Version: {_selectedVersion}"));
+        _infoFrame.Add(new Label(2, 2, $"Repo: {RepoOwner}/{RepoName}"));
+    }
+
+    private void ReplaceContent(string title, params View[] views)
+    {
+        if (_contentFrame is null)
+        {
+            return;
+        }
+
+        _contentFrame.Title = title;
+        _contentFrame.RemoveAll();
+        foreach (var view in views)
+        {
+            _contentFrame.Add(view);
+        }
+
+        UpdateInfoFrame();
+        SetInitialFocus();
+    }
+
+    private void SetInitialFocus()
+    {
+        if (_contentFrame is null)
+        {
+            return;
+        }
+
+        foreach (var subview in _contentFrame.Subviews)
+        {
+            if (subview.CanFocus)
+            {
+                _contentFrame.FocusFirst();
+                break;
+            }
         }
     }
 
     private void ShowMainMenu()
     {
         var state = LoadState();
-        var currentVersion = state?.Version ?? "None";
-        var currentAgent = state?.AgentType ?? "None";
-        var actionLabel = currentVersion == "None" ? "Install" : "Install / Update";
+        var installButton = CreateButton(28, 8, "_Install / Update", StartInstallWizard);
+        var uninstallButton = CreateButton(52, 8, "_Uninstall", RunUninstallFlow);
 
-        var window = CreateCenteredWindow("Agentic Skills Installer", 78, 20);
-        AddHeader(window, currentVersion, currentAgent);
+        _window!.KeyPress -= MainMenuKeyPress;
+        _window.KeyPress += MainMenuKeyPress;
 
-        var installButton = new Button("_Install / Update")
-        {
-            X = Pos.Center() - 18,
-            Y = 10,
-            IsDefault = true
-        };
-        installButton.Clicked += () => StartInstallWizard();
-
-        var uninstallButton = new Button("_Uninstall")
-        {
-            X = Pos.Center() + 4,
-            Y = 10
-        };
-        uninstallButton.Clicked += RunUninstallFlow;
-
-        var quitButton = new Button("_Quit")
-        {
-            X = Pos.Center() - 4,
-            Y = 13
-        };
-        quitButton.Clicked += () => Application.RequestStop();
-
-        window.Add(
-            new Label("Use keyboard shortcuts or mouse to continue.")
-            {
-                X = Pos.Center() - 21,
-                Y = 8
-            },
+        ReplaceContent(
+            "Welcome",
+            new Label(28, 4, "Choose what you want to do."),
+            new Label(28, 5, "Hotkeys: I = Install/Update, U = Uninstall, Ctrl+C = Exit"),
+            new Label(28, 6, state is null ? "No previous installation found." : "Existing installation detected."),
             installButton,
-            uninstallButton,
-            quitButton);
+            uninstallButton);
+    }
 
-        ReplaceTop(window);
+    private void MainMenuKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == Key.I || args.KeyEvent.Key == Key.i)
+        {
+            args.Handled = true;
+            StartInstallWizard();
+        }
+
+        if (args.KeyEvent.Key == Key.U || args.KeyEvent.Key == Key.u)
+        {
+            args.Handled = true;
+            RunUninstallFlow();
+        }
     }
 
     private void StartInstallWizard()
     {
-        var agentType = SelectAgentType();
-        if (agentType is null)
+        _window!.KeyPress -= MainMenuKeyPress;
+        ShowAgentTypeStep();
+    }
+
+    private void ShowAgentTypeStep()
+    {
+        var options = new List<string> { DefaultAgentType };
+        var listView = CreateListView(options, _agentTypeIndex, 4, 10);
+        listView.SelectedItemChanged += args => _agentTypeIndex = args.Item;
+
+        _window!.KeyPress -= AgentTypeKeyPress;
+        _window.KeyPress += AgentTypeKeyPress;
+
+        ReplaceContent(
+            "Agent Type",
+            new Label(2, 1, "Select the agent platform you want to install these packages into."),
+            new Label(2, 2, "Available agent types:"),
+            listView,
+            CreateButton(32, 17, "_Next", () =>
+            {
+                _selectedAgentType = options[listView.SelectedItem];
+                _agentTypeIndex = listView.SelectedItem;
+                _window!.KeyPress -= AgentTypeKeyPress;
+                ShowVersionStep();
+            }),
+            CreateButton(48, 17, "_Cancel", () =>
+            {
+                _window!.KeyPress -= AgentTypeKeyPress;
+                ShowMainMenu();
+            }));
+    }
+
+    private void AgentTypeKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
         {
-            return;
+            args.Handled = true;
+            FocusInvoke("_Next");
         }
 
-        _agentType = agentType;
-
-        var version = SelectVersion();
-        if (version is null)
+        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
         {
-            return;
+            args.Handled = true;
+            FocusInvoke("_Cancel");
+        }
+    }
+
+    private void ShowVersionStep()
+    {
+        var versions = GetVersions();
+        _versionIndex = Math.Clamp(_versionIndex, 0, Math.Max(versions.Count - 1, 0));
+        var listView = CreateListView(versions, _versionIndex, 4, 12);
+        listView.SelectedItemChanged += args => _versionIndex = args.Item;
+
+        _window!.KeyPress -= VersionKeyPress;
+        _window.KeyPress += VersionKeyPress;
+
+        ReplaceContent(
+            "Version",
+            new Label(2, 1, "Select the version to install. `latest` uses the head of the main branch."),
+            new Label(2, 2, "Available versions:"),
+            listView,
+            CreateButton(30, 19, "_Next", () =>
+            {
+                _selectedVersion = versions[listView.SelectedItem];
+                _versionIndex = listView.SelectedItem;
+                _window!.KeyPress -= VersionKeyPress;
+                ShowPackagesStep();
+            }),
+            CreateButton(46, 19, "_Back", () =>
+            {
+                _window!.KeyPress -= VersionKeyPress;
+                ShowAgentTypeStep();
+            }));
+    }
+
+    private void VersionKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        {
+            args.Handled = true;
+            FocusInvoke("_Next");
         }
 
-        _selectedVersion = version;
+        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
+        {
+            args.Handled = true;
+            FocusInvoke("_Back");
+        }
+    }
 
-        PackageMetadata metadata;
+    private void ShowPackagesStep()
+    {
         try
         {
-            metadata = GetPackageMetadata(version);
+            _availablePackages = GetPackageMetadata(_selectedVersion).Packages;
         }
         catch (Exception ex)
         {
             MessageBox.ErrorQuery("Installer", ex.Message, "OK");
+            ShowVersionStep();
             return;
         }
 
-        var selectedPackages = SelectPackages(metadata);
-        if (selectedPackages is null || selectedPackages.Count == 0)
+        if (_selectedPackages.Count == 0)
         {
-            return;
+            var previous = LoadState()?.Packages;
+            _selectedPackages = previous is { Count: > 0 }
+                ? new List<string>(previous)
+                : _availablePackages.Select(pkg => pkg.Id).ToList();
         }
 
+        var checkBoxes = new List<CheckBox>();
+        var views = new List<View>
+        {
+            new Label(2, 1, "Select the packages to install for the chosen version."),
+            new Label(2, 2, "Use space to toggle items. A = Select All, U = Unselect All, N = Next, B = Back")
+        };
+
+        for (var i = 0; i < _availablePackages.Count; i++)
+        {
+            var package = _availablePackages[i];
+            var checkBox = new CheckBox(2, i + 4, package.Id)
+            {
+                Checked = _selectedPackages.Contains(package.Id)
+            };
+            views.Add(checkBox);
+            views.Add(new Label(28, i + 4, package.Description));
+            checkBoxes.Add(checkBox);
+        }
+
+        void SyncSelection()
+        {
+            _selectedPackages = _availablePackages
+                .Where((pkg, index) => checkBoxes[index].Checked)
+                .Select(pkg => pkg.Id)
+                .ToList();
+        }
+
+        void SetAll(bool selected)
+        {
+            foreach (var checkBox in checkBoxes)
+            {
+                checkBox.Checked = selected;
+            }
+
+            SyncSelection();
+        }
+
+        var selectAllButton = CreateButton(2, _availablePackages.Count + 6, "Select _All", () => SetAll(true));
+        var unselectAllButton = CreateButton(16, _availablePackages.Count + 6, "_Unselect All", () => SetAll(false));
+        var nextButton = CreateButton(40, _availablePackages.Count + 6, "_Next", () =>
+        {
+            SyncSelection();
+            ShowReviewStep();
+        });
+        var backButton = CreateButton(52, _availablePackages.Count + 6, "_Back", () =>
+        {
+            SyncSelection();
+            _window!.KeyPress -= PackagesKeyPress;
+            ShowVersionStep();
+        });
+
+        views.Add(selectAllButton);
+        views.Add(unselectAllButton);
+        views.Add(nextButton);
+        views.Add(backButton);
+
+        _window!.KeyPress -= PackagesKeyPress;
+        _window.KeyPress += PackagesKeyPress;
+        ReplaceContent("Packages", views.ToArray());
+    }
+
+    private void PackagesKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == Key.A || args.KeyEvent.Key == Key.a)
+        {
+            args.Handled = true;
+            FocusInvoke("Select _All");
+        }
+
+        if (args.KeyEvent.Key == Key.U || args.KeyEvent.Key == Key.u)
+        {
+            args.Handled = true;
+            FocusInvoke("_Unselect All");
+        }
+
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        {
+            args.Handled = true;
+            FocusInvoke("_Next");
+        }
+
+        if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
+        {
+            args.Handled = true;
+            FocusInvoke("_Back");
+        }
+    }
+
+    private void ShowReviewStep()
+    {
+        _window!.KeyPress -= PackagesKeyPress;
+        _window.KeyPress -= ReviewKeyPress;
+        _window.KeyPress += ReviewKeyPress;
+
+        var lines = new List<string>
+        {
+            $"Agent Type: {_selectedAgentType}",
+            $"Version: {_selectedVersion}",
+            "Packages:"
+        };
+        lines.AddRange(_selectedPackages.Select(pkg => $"- {pkg}"));
+
+        ReplaceContent(
+            "Review",
+            new Label(2, 1, "Review your selections before installation."),
+            new TextView
+            {
+                X = 2,
+                Y = 3,
+                Width = Dim.Fill() - 4,
+                Height = 14,
+                ReadOnly = true,
+                WordWrap = false,
+                Text = string.Join(Environment.NewLine, lines)
+            },
+            CreateButton(26, 19, "_Confirm and Install", ConfirmInstall),
+            CreateButton(52, 19, "_Back", () =>
+            {
+                _window!.KeyPress -= ReviewKeyPress;
+                ShowPackagesStep();
+            }));
+    }
+
+    private void ReviewKeyPress(View.KeyEventEventArgs args)
+    {
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        {
+            args.Handled = true;
+            FocusInvoke("_Confirm and Install");
+        }
+
+        if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
+        {
+            args.Handled = true;
+            FocusInvoke("_Back");
+        }
+    }
+
+    private void ConfirmInstall()
+    {
         try
         {
             var previousState = LoadState();
             if (previousState is not null)
             {
-                RemovePreviouslyInstalledPackages(previousState);
+                RemoveExistingInstallationArtifacts();
             }
 
-            var savedVersion = version == "latest" ? GetLocalVersionLabel() : version;
-            var newState = new InstalledState(savedVersion, _agentType, selectedPackages, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-            SaveState(newState);
-            DeployPackages(version, selectedPackages);
+            var savedVersion = _selectedVersion == "latest" ? GetLocalVersionLabel() : _selectedVersion;
+            SaveState(new InstalledState(savedVersion, _selectedAgentType, new List<string>(_selectedPackages), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
+            DeployPackages(_selectedVersion, _selectedPackages);
 
-            MessageBox.Query("Installer", $"Installation complete.\nVersion: {savedVersion}\nAgent: {_agentType}", "OK");
+            _window!.KeyPress -= ReviewKeyPress;
+            MessageBox.Query("Installer", $"Installation complete.\nVersion: {savedVersion}\nAgent: {_selectedAgentType}", "OK");
             ShowMainMenu();
         }
         catch (Exception ex)
@@ -144,12 +463,7 @@ internal sealed class InstallerApp
 
         try
         {
-            var state = LoadState();
-            if (state is not null)
-            {
-                RemovePreviouslyInstalledPackages(state);
-            }
-
+            RemoveExistingInstallationArtifacts();
             var statePath = Path.Combine(_workspaceRoot, StateFile);
             if (File.Exists(statePath))
             {
@@ -165,111 +479,13 @@ internal sealed class InstallerApp
         }
     }
 
-    private string? SelectAgentType()
+    private void RemoveExistingInstallationArtifacts()
     {
-        var dialog = CreateCenteredDialog("Select Agent Type", 60, 16);
-        var options = new List<string> { DefaultAgentType };
-        var listView = new ListView(options)
+        var opencodePath = Path.Combine(_workspaceRoot, ".opencode");
+        if (Directory.Exists(opencodePath))
         {
-            X = 2,
-            Y = 4,
-            Width = Dim.Fill() - 4,
-            Height = 4
-        };
-
-        dialog.Add(CreateHeaderView("Agent Type", LoadState()?.Version ?? "None", _agentType));
-        dialog.Add(new Label("Choose the agent platform to install into.") { X = Pos.Center() - 20, Y = 2 });
-        dialog.Add(listView);
-
-        string? selected = null;
-        var nextButton = new Button("_Next", is_default: true);
-        nextButton.Clicked += () =>
-        {
-            selected = options[listView.SelectedItem];
-            Application.RequestStop();
-        };
-
-        var cancelButton = new Button("_Cancel");
-        cancelButton.Clicked += () => Application.RequestStop();
-
-        dialog.AddButton(nextButton);
-        dialog.AddButton(cancelButton);
-        Application.Run(dialog);
-        return selected;
-    }
-
-    private string? SelectVersion()
-    {
-        var versions = GetVersions();
-        var dialog = CreateCenteredDialog("Select Version", 72, 20);
-        var listView = new ListView(versions)
-        {
-            X = 2,
-            Y = 4,
-            Width = Dim.Fill() - 4,
-            Height = 9
-        };
-
-        dialog.Add(CreateHeaderView("Version", LoadState()?.Version ?? "None", _agentType));
-        dialog.Add(new Label("Choose `latest` or a specific tag.") { X = Pos.Center() - 17, Y = 2 });
-        dialog.Add(listView);
-
-        string? selected = null;
-        var nextButton = new Button("_Next", is_default: true);
-        nextButton.Clicked += () =>
-        {
-            selected = versions[listView.SelectedItem];
-            Application.RequestStop();
-        };
-
-        var backButton = new Button("_Back");
-        backButton.Clicked += () => Application.RequestStop();
-
-        dialog.AddButton(nextButton);
-        dialog.AddButton(backButton);
-        Application.Run(dialog);
-        return selected;
-    }
-
-    private List<string>? SelectPackages(PackageMetadata metadata)
-    {
-        var previous = LoadState()?.Packages ?? new List<string>();
-        var dialog = CreateCenteredDialog("Select Packages", 96, Math.Min(26, metadata.Packages.Count + 10));
-        dialog.Add(CreateHeaderView("Packages", LoadState()?.Version ?? "None", _agentType));
-        dialog.Add(new Label($"Version: {_selectedVersion}") { X = 2, Y = 2 });
-        dialog.Add(new Label("Use space to toggle packages. Enter activates the default button.") { X = 2, Y = 3 });
-
-        var checkBoxes = new List<CheckBox>();
-        for (var i = 0; i < metadata.Packages.Count; i++)
-        {
-            var package = metadata.Packages[i];
-            var checkBox = new CheckBox(2, i + 5, package.Id)
-            {
-                Checked = previous.Count > 0 ? previous.Contains(package.Id) : true
-            };
-            dialog.Add(checkBox);
-            dialog.Add(new Label(28, i + 5, package.Description));
-            checkBoxes.Add(checkBox);
+            Directory.Delete(opencodePath, true);
         }
-
-        List<string>? selected = null;
-        var installButton = new Button("_Install", is_default: true);
-        installButton.Clicked += () =>
-        {
-            selected = metadata.Packages
-                .Where((pkg, index) => checkBoxes[index].Checked)
-                .Select(pkg => pkg.Id)
-                .ToList();
-            Application.RequestStop();
-        };
-
-        var backButton = new Button("_Back");
-        backButton.Clicked += () => Application.RequestStop();
-
-        dialog.AddButton(installButton);
-        dialog.AddButton(backButton);
-        Application.Run(dialog);
-        return selected;
     }
 
     private List<string> GetVersions()
@@ -280,7 +496,6 @@ internal sealed class InstallerApp
             request.Headers.Add("User-Agent", "AgenticSkillsInstaller");
             var response = _httpClient.Send(request);
             response.EnsureSuccessStatusCode();
-
             var tags = JsonSerializer.Deserialize<List<GitTag>>(response.Content.ReadAsStringAsync().Result, JsonOptions()) ?? new List<GitTag>();
             var versions = new List<string> { "latest" };
             versions.AddRange(tags.Select(tag => tag.Name));
@@ -331,7 +546,6 @@ internal sealed class InstallerApp
 
         var branch = version == "latest" ? "main" : version;
         var url = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/{branch}/packages.json";
-
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Add("User-Agent", "AgenticSkillsInstaller");
         var response = _httpClient.Send(request);
@@ -350,45 +564,6 @@ internal sealed class InstallerApp
         response.EnsureSuccessStatusCode();
         return JsonSerializer.Deserialize<PackageMetadata>(response.Content.ReadAsStringAsync().Result, JsonOptions())
             ?? throw new InvalidOperationException("Failed to parse packages.json.");
-    }
-
-    private void RemovePreviouslyInstalledPackages(InstalledState state)
-    {
-        if (!string.Equals(state.AgentType, DefaultAgentType, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"Unsupported agent type in state file: {state.AgentType}");
-        }
-
-        var skillsBase = Path.Combine(_workspaceRoot, ".opencode", "skills");
-        foreach (var packageId in state.Packages)
-        {
-            var installedPackageDir = Path.Combine(skillsBase, packageId);
-            if (Directory.Exists(installedPackageDir))
-            {
-                Directory.Delete(installedPackageDir, true);
-            }
-        }
-
-        var opencodePath = Path.Combine(_workspaceRoot, ".opencode");
-        if (Directory.Exists(opencodePath))
-        {
-            var skillsPath = Path.Combine(opencodePath, "skills");
-            var agentsPath = Path.Combine(opencodePath, "agents");
-            if (Directory.Exists(skillsPath) && !Directory.EnumerateFileSystemEntries(skillsPath).Any())
-            {
-                Directory.Delete(skillsPath, true);
-            }
-
-            if (Directory.Exists(agentsPath) && !Directory.EnumerateFileSystemEntries(agentsPath).Any())
-            {
-                Directory.Delete(agentsPath, true);
-            }
-
-            if (!Directory.EnumerateFileSystemEntries(opencodePath).Any())
-            {
-                Directory.Delete(opencodePath, true);
-            }
-        }
     }
 
     private void DeployPackages(string version, IReadOnlyCollection<string> selectedPackages)
@@ -427,18 +602,18 @@ internal sealed class InstallerApp
     private string DownloadAndExtractSource(string branch, string tempDir)
     {
         var zipPath = Path.Combine(tempDir, "source.zip");
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/heads/{branch}.zip");
-        request.Headers.Add("User-Agent", "AgenticSkillsInstaller");
-        var response = _httpClient.Send(request);
+        using var branchRequest = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/heads/{branch}.zip");
+        branchRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
+        var response = _httpClient.Send(branchRequest);
 
         if (!response.IsSuccessStatusCode && branch != "main")
         {
             response.Dispose();
-            using var fallbackRequest = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/tags/{branch}.zip");
-            fallbackRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
-            var fallbackResponse = _httpClient.Send(fallbackRequest);
-            fallbackResponse.EnsureSuccessStatusCode();
-            File.WriteAllBytes(zipPath, fallbackResponse.Content.ReadAsByteArrayAsync().Result);
+            using var tagRequest = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/tags/{branch}.zip");
+            tagRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
+            var tagResponse = _httpClient.Send(tagRequest);
+            tagResponse.EnsureSuccessStatusCode();
+            File.WriteAllBytes(zipPath, tagResponse.Content.ReadAsByteArrayAsync().Result);
         }
         else
         {
@@ -511,54 +686,38 @@ internal sealed class InstallerApp
         File.WriteAllText(statePath, JsonSerializer.Serialize(state, JsonOptions()));
     }
 
-    private Window CreateCenteredWindow(string title, int width, int height)
+    private static ListView CreateListView(IList<string> items, int selectedItem, int y, int height)
     {
-        return new Window(title)
+        return new ListView(new ArrayList(items.ToArray()))
         {
-            X = Pos.Center(),
-            Y = Pos.Center(),
-            Width = width,
-            Height = height
+            X = 2,
+            Y = y,
+            Width = Dim.Fill() - 4,
+            Height = height,
+            SelectedItem = selectedItem
         };
     }
 
-    private Dialog CreateCenteredDialog(string title, int width, int height)
+    private static Button CreateButton(int x, int y, string text, Action onClick)
     {
-        return new Dialog(title, width, height)
+        var button = new Button(text)
         {
-            X = Pos.Center(),
-            Y = Pos.Center()
+            X = x,
+            Y = y
         };
+        button.Clicked += onClick;
+        return button;
     }
 
-    private void AddHeader(Window window, string currentVersion, string currentAgent)
+    private void FocusInvoke(string buttonText)
     {
-        window.Add(CreateHeaderView("Main Menu", currentVersion, currentAgent));
-    }
-
-    private View CreateHeaderView(string stepName, string currentVersion, string currentAgent)
-    {
-        var frame = new FrameView()
+        if (_contentFrame is null)
         {
-            X = 1,
-            Y = 0,
-            Width = Dim.Fill() - 2,
-            Height = 5,
-            CanFocus = false,
-            Title = stepName
-        };
+            return;
+        }
 
-        frame.Add(new Label($"Agentic Skills Installer") { X = 2, Y = 0 });
-        frame.Add(new Label($"Installed Version: {currentVersion}") { X = 2, Y = 1 });
-        frame.Add(new Label($"Agent Type: {currentAgent}") { X = 34, Y = 1 });
-        frame.Add(new Label($"Repo: {RepoOwner}/{RepoName}") { X = 2, Y = 2 });
-        return frame;
-    }
-
-    private void ReplaceTop(View view)
-    {
-        Application.Top.RemoveAll();
-        Application.Top.Add(view);
+        var button = _contentFrame.Subviews.OfType<Button>().FirstOrDefault(b => b.Text.ToString() == buttonText);
+        button?.OnClicked();
     }
 
     private static void CopyDirectory(string sourceDir, string destinationDir)
@@ -569,7 +728,6 @@ internal sealed class InstallerApp
         }
 
         Directory.CreateDirectory(destinationDir);
-
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             File.Copy(file, Path.Combine(destinationDir, Path.GetFileName(file)), true);
