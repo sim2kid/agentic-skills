@@ -71,7 +71,8 @@ function Get-PackageMetadata ($version) {
     $branch = if ($version -eq "latest") { "main" } else { $version }
     $url = "https://raw.githubusercontent.com/$repoOwner/$repoName/$branch/packages.json"
     try {
-        return Invoke-RestMethod -Uri $url
+        $response = Invoke-WebRequest -Uri $url -ErrorAction Stop
+        return $response.Content | ConvertFrom-Json
     } catch {
         Write-Error "Failed to fetch packages.json: $($_.Exception.Message)"
         exit 1
@@ -195,7 +196,8 @@ $currentVersion = if ($state) { $state.version } else { "None" }
 Write-Host "Current Installed Version: $currentVersion" -ForegroundColor Gray
 
 Write-Host "`nWhat would you like to do?" -ForegroundColor Yellow
-Write-Host "[0] Install / Update"
+    $actionLabel = if ($currentVersion -eq "None") { "Install" } else { "Install / Update" }
+    Write-Host "[0] $actionLabel"
 Write-Host "[1] Uninstall"
 $action = Read-Host "Enter choice (default 0)"
 if ([string]::IsNullOrWhiteSpace($action)) { $action = 0 }
