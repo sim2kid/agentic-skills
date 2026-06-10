@@ -40,7 +40,7 @@ A dedicated install script is provided to deploy these skills into target reposi
 
 Run the installation command (Windows):
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/sim2kid/agentic-skills/main/install-tui.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "$t = Join-Path $env:TEMP ('agentic-skills-install-tui-' + [guid]::NewGuid().ToString('N') + '.ps1'); iwr -useb https://raw.githubusercontent.com/sim2kid/agentic-skills/main/install-tui.ps1 -OutFile $t; powershell -ExecutionPolicy Bypass -File $t"
 ```
 
 ## Testing & Validation

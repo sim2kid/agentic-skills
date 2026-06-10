@@ -14,6 +14,9 @@ if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
 $repoRoot = $PSScriptRoot
 $projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
 
+Write-Host "Bootstrap file path: $($MyInvocation.MyCommand.Path)" -ForegroundColor DarkGray
+Write-Host "Script root: $PSScriptRoot" -ForegroundColor DarkGray
+
 function Show-Welcome {
     Clear-Host
     Write-Host "========================================" -ForegroundColor Cyan
