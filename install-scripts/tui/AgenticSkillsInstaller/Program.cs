@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text;
 using System.Text.Json;
 using Terminal.Gui;
 
@@ -12,8 +13,9 @@ internal sealed class InstallerApp
     private const string StateFile = ".agents/agent-packages-installed.json";
     private const string DefaultAgentType = "OpenCode";
     private const int ShellWidth = 100;
-    private const int ShellHeight = 30;
-    private const int ButtonRowY = 22;
+    private const int ShellHeight = 32;
+    private const int ButtonRowY = 24;
+    private const int PackagePageSize = 8;
 
     private readonly HttpClient _httpClient = new();
     private readonly string _workspaceRoot = Environment.CurrentDirectory;
@@ -25,8 +27,10 @@ internal sealed class InstallerApp
     private string _selectedVersion = "latest";
     private List<string> _selectedPackages = new();
     private List<PackageDefinition> _availablePackages = new();
+    private readonly Dictionary<string, HashSet<string>> _forcedBy = new(StringComparer.OrdinalIgnoreCase);
     private int _agentTypeIndex;
     private int _versionIndex;
+    private int _packagePageIndex;
 
     public void Run()
     {
@@ -127,16 +131,6 @@ internal sealed class InstallerApp
         }
 
         UpdateInfoFrame();
-        SetInitialFocus();
-    }
-
-    private void SetInitialFocus()
-    {
-        if (_contentFrame is null)
-        {
-            return;
-        }
-
         _contentFrame.FocusFirst();
     }
 
@@ -150,7 +144,7 @@ internal sealed class InstallerApp
         ReplaceContent(
             "Welcome",
             new Label(28, 4, "Choose what you want to do."),
-            new Label(28, 5, "Hotkeys: I = Install/Update, U = Uninstall, Ctrl+C = Exit"),
+            new Label(28, 5, "Press Ctrl+C at any time to exit."),
             new Label(28, 6, state is null ? "No previous installation found." : "Existing installation detected."),
             CreateButton(28, ButtonRowY, "_Install / Update", StartInstallWizard),
             CreateButton(52, ButtonRowY, "_Uninstall", RunUninstallFlow));
@@ -180,7 +174,13 @@ internal sealed class InstallerApp
     private void ShowAgentTypeStep()
     {
         var options = new List<string> { DefaultAgentType };
+        if (_agentTypeIndex < 0 || _agentTypeIndex >= options.Count)
+        {
+            _agentTypeIndex = 0;
+        }
+
         var listView = CreateListView(options, _agentTypeIndex, 4, 12);
+        listView.SelectedItem = _agentTypeIndex;
         listView.SelectedItemChanged += args => _agentTypeIndex = args.Item;
 
         _window!.KeyPress -= AgentTypeKeyPress;
@@ -203,6 +203,8 @@ internal sealed class InstallerApp
                 _window!.KeyPress -= AgentTypeKeyPress;
                 ShowMainMenu();
             }));
+
+        listView.SetFocus();
     }
 
     private void AgentTypeKeyPress(View.KeyEventEventArgs args)
@@ -213,7 +215,7 @@ internal sealed class InstallerApp
             ActivateButtonByText("_Next");
         }
 
-        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
+        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c || args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
         {
             args.Handled = true;
             ActivateButtonByText("_Back");
@@ -225,6 +227,7 @@ internal sealed class InstallerApp
         var versions = GetVersions();
         _versionIndex = Math.Clamp(_versionIndex, 0, Math.Max(versions.Count - 1, 0));
         var listView = CreateListView(versions, _versionIndex, 4, 12);
+        listView.SelectedItem = _versionIndex;
         listView.SelectedItemChanged += args => _versionIndex = args.Item;
 
         _window!.KeyPress -= VersionKeyPress;
@@ -247,6 +250,8 @@ internal sealed class InstallerApp
                 _window!.KeyPress -= VersionKeyPress;
                 ShowAgentTypeStep();
             }));
+
+        listView.SetFocus();
     }
 
     private void VersionKeyPress(View.KeyEventEventArgs args)
@@ -285,60 +290,139 @@ internal sealed class InstallerApp
                 : _availablePackages.Select(pkg => pkg.Id).ToList();
         }
 
-        var checkBoxes = new List<CheckBox>();
-        var views = new List<View>
+        NormalizeForcedDependencies();
+        RenderPackagesPage();
+    }
+
+    private void RenderPackagesPage()
+    {
+        _window!.KeyPress -= PackagesKeyPress;
+        _window.KeyPress += PackagesKeyPress;
+
+        var totalPages = Math.Max(1, (int)Math.Ceiling(_availablePackages.Count / (double)PackagePageSize));
+        _packagePageIndex = Math.Clamp(_packagePageIndex, 0, totalPages - 1);
+        var startIndex = _packagePageIndex * PackagePageSize;
+        var pagePackages = _availablePackages.Skip(startIndex).Take(PackagePageSize).ToList();
+
+        var descriptionView = new TextView
         {
-            new Label(2, 1, "Select the packages to install for the chosen version."),
-            new Label(2, 2, "Use space to toggle items. A = Select All, U = Unselect All, N/Enter = Next, B = Back")
+            X = 2,
+            Y = 15,
+            Width = Dim.Fill() - 4,
+            Height = 6,
+            ReadOnly = true,
+            WordWrap = true,
+            CanFocus = false,
+            Text = string.Empty
         };
 
-        for (var i = 0; i < _availablePackages.Count; i++)
+        var packageRows = new List<PackageRow>();
+        var views = new List<View>
         {
-            var package = _availablePackages[i];
-            var checkBox = new CheckBox(2, i + 4, package.Id)
+            new Label(2, 1, "Select packages to install. Space or Enter toggles the selected package."),
+            CreateButton(2, 3, "Select _All", () =>
             {
-                Checked = _selectedPackages.Contains(package.Id)
-            };
-            checkBoxes.Add(checkBox);
-            views.Add(checkBox);
-            views.Add(new Label(28, i + 4, package.Description));
-        }
-
-        void SyncSelection()
-        {
-            _selectedPackages = _availablePackages
-                .Where((pkg, index) => checkBoxes[index].Checked)
-                .Select(pkg => pkg.Id)
-                .ToList();
-        }
-
-        void SetAll(bool selected)
-        {
-            foreach (var checkBox in checkBoxes)
+                SelectAllPackages();
+                RenderPackagesPage();
+            }),
+            CreateButton(16, 3, "_Unselect All", () =>
             {
-                checkBox.Checked = selected;
-            }
+                UnselectAllPackages();
+                RenderPackagesPage();
+            }),
+            new Label(34, 3, $"Page {_packagePageIndex + 1} of {totalPages}")
+        };
 
-            SyncSelection();
+        for (var index = 0; index < pagePackages.Count; index++)
+        {
+            var package = pagePackages[index];
+            var row = CreatePackageRow(package, startIndex + index, 5 + index, descriptionView);
+            packageRows.Add(row);
+            views.Add(row.Toggle);
+            views.Add(row.Status);
         }
 
-        views.Add(CreateButton(2, ButtonRowY, "Select _All", () => SetAll(true)));
-        views.Add(CreateButton(16, ButtonRowY, "_Unselect All", () => SetAll(false)));
-        views.Add(CreateButton(40, ButtonRowY, "_Next", () =>
+        views.Add(new Label(2, 13, "Package details:"));
+        views.Add(descriptionView);
+
+        if (totalPages > 1)
         {
-            SyncSelection();
-            ShowReviewStep();
-        }));
+            views.Add(CreateButton(2, ButtonRowY, "_Previous Page", () =>
+            {
+                _packagePageIndex = Math.Max(0, _packagePageIndex - 1);
+                RenderPackagesPage();
+            }));
+
+            views.Add(CreateButton(20, ButtonRowY, "_Next Page", () =>
+            {
+                _packagePageIndex = Math.Min(totalPages - 1, _packagePageIndex + 1);
+                RenderPackagesPage();
+            }));
+        }
+
+        views.Add(CreateButton(40, ButtonRowY, "_Next", ShowReviewStep));
         views.Add(CreateButton(52, ButtonRowY, "_Back", () =>
         {
-            SyncSelection();
             _window!.KeyPress -= PackagesKeyPress;
             ShowVersionStep();
         }));
 
-        _window!.KeyPress -= PackagesKeyPress;
-        _window.KeyPress += PackagesKeyPress;
         ReplaceContent("Packages", views.ToArray());
+
+        if (packageRows.Count > 0)
+        {
+            UpdateDescription(descriptionView, pagePackages[0]);
+            packageRows[0].Toggle.SetFocus();
+        }
+    }
+
+    private PackageRow CreatePackageRow(PackageDefinition package, int absoluteIndex, int y, TextView descriptionView)
+    {
+        var toggle = new CheckBox(2, y, package.Id)
+        {
+            Checked = _selectedPackages.Contains(package.Id)
+        };
+        var status = new Label(28, y, GetPackageStatusText(package.Id));
+
+        toggle.Enter += _ => UpdateDescription(descriptionView, package);
+        toggle.Leave += _ => UpdateDescription(descriptionView, package);
+        toggle.KeyPress += args =>
+        {
+            if (args.KeyEvent.Key == Key.Enter || args.KeyEvent.Key == Key.Space)
+            {
+                args.Handled = true;
+                TogglePackage(package.Id);
+                RenderPackagesPage();
+            }
+        };
+        toggle.MouseClick += _ =>
+        {
+            UpdateDescription(descriptionView, package);
+            TogglePackage(package.Id);
+            RenderPackagesPage();
+        };
+
+        return new PackageRow(toggle, status, absoluteIndex);
+    }
+
+    private void UpdateDescription(TextView descriptionView, PackageDefinition package)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(package.Description);
+        if (package.Dependencies.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine($"Dependencies: {string.Join(", ", package.Dependencies)}");
+        }
+
+        var forcedBy = GetForcedByText(package.Id);
+        if (!string.IsNullOrWhiteSpace(forcedBy))
+        {
+            builder.AppendLine();
+            builder.AppendLine(forcedBy);
+        }
+
+        descriptionView.Text = builder.ToString();
     }
 
     private void PackagesKeyPress(View.KeyEventEventArgs args)
@@ -346,16 +430,18 @@ internal sealed class InstallerApp
         if (args.KeyEvent.Key == Key.A || args.KeyEvent.Key == Key.a)
         {
             args.Handled = true;
-            ActivateButtonByText("Select _All");
+            SelectAllPackages();
+            RenderPackagesPage();
         }
 
         if (args.KeyEvent.Key == Key.U || args.KeyEvent.Key == Key.u)
         {
             args.Handled = true;
-            ActivateButtonByText("_Unselect All");
+            UnselectAllPackages();
+            RenderPackagesPage();
         }
 
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
         {
             args.Handled = true;
             ActivateButtonByText("_Next");
@@ -365,6 +451,18 @@ internal sealed class InstallerApp
         {
             args.Handled = true;
             ActivateButtonByText("_Back");
+        }
+
+        if (args.KeyEvent.Key == Key.PageDown)
+        {
+            args.Handled = true;
+            ActivateButtonByText("_Next Page");
+        }
+
+        if (args.KeyEvent.Key == Key.PageUp)
+        {
+            args.Handled = true;
+            ActivateButtonByText("_Previous Page");
         }
     }
 
@@ -380,7 +478,7 @@ internal sealed class InstallerApp
             $"Version: {_selectedVersion}",
             "Packages:"
         };
-        lines.AddRange(_selectedPackages.Select(pkg => $"- {pkg}"));
+        lines.AddRange(_selectedPackages.Select(pkg => $"- {pkg}{GetForcedSuffix(pkg)}"));
 
         ReplaceContent(
             "Review",
@@ -390,16 +488,17 @@ internal sealed class InstallerApp
                 X = 2,
                 Y = 3,
                 Width = Dim.Fill() - 4,
-                Height = 14,
+                Height = 16,
                 ReadOnly = true,
                 WordWrap = false,
+                CanFocus = false,
                 Text = string.Join(Environment.NewLine, lines)
             },
             CreateButton(26, ButtonRowY, "_Confirm and Install", ConfirmInstall),
             CreateButton(52, ButtonRowY, "_Back", () =>
             {
                 _window!.KeyPress -= ReviewKeyPress;
-                ShowPackagesStep();
+                RenderPackagesPage();
             }));
     }
 
@@ -439,6 +538,154 @@ internal sealed class InstallerApp
         {
             MessageBox.ErrorQuery("Installer", ex.Message, "OK");
         }
+    }
+
+    private void TogglePackage(string packageId)
+    {
+        if (_selectedPackages.Contains(packageId))
+        {
+            if (_forcedBy.TryGetValue(packageId, out var forcedBy) && forcedBy.Count > 0)
+            {
+                MessageBox.ErrorQuery("Dependency Required", $"`{packageId}` is required by: {string.Join(", ", forcedBy.OrderBy(x => x))}", "OK");
+                return;
+            }
+
+            _selectedPackages.Remove(packageId);
+            RemoveDependencyForcers(packageId);
+            return;
+        }
+
+        AddPackageWithDependencies(packageId, packageId);
+    }
+
+    private void AddPackageWithDependencies(string packageId, string requestedBy)
+    {
+        if (!_selectedPackages.Contains(packageId))
+        {
+            _selectedPackages.Add(packageId);
+        }
+
+        var package = _availablePackages.FirstOrDefault(pkg => string.Equals(pkg.Id, packageId, StringComparison.OrdinalIgnoreCase));
+        if (package is null)
+        {
+            return;
+        }
+
+        foreach (var dependency in package.Dependencies)
+        {
+            if (!_forcedBy.TryGetValue(dependency, out var forcedBy))
+            {
+                forcedBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                _forcedBy[dependency] = forcedBy;
+            }
+
+            forcedBy.Add(packageId == requestedBy ? packageId : requestedBy);
+            AddPackageWithDependencies(dependency, packageId == requestedBy ? packageId : requestedBy);
+        }
+    }
+
+    private void RemoveDependencyForcers(string packageId)
+    {
+        foreach (var entry in _forcedBy.Values)
+        {
+            entry.Remove(packageId);
+        }
+
+        var autoSelected = _forcedBy
+            .Where(pair => pair.Value.Count == 0)
+            .Select(pair => pair.Key)
+            .ToList();
+
+        foreach (var dependency in autoSelected)
+        {
+            _forcedBy.Remove(dependency);
+            if (_selectedPackages.Contains(dependency) && !IsRequiredBySelectedPackage(dependency))
+            {
+                _selectedPackages.Remove(dependency);
+                RemoveDependencyForcers(dependency);
+            }
+        }
+    }
+
+    private bool IsRequiredBySelectedPackage(string dependencyId)
+    {
+        return _availablePackages
+            .Where(pkg => _selectedPackages.Contains(pkg.Id))
+            .Any(pkg => pkg.Dependencies.Contains(dependencyId, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private void NormalizeForcedDependencies()
+    {
+        _forcedBy.Clear();
+
+        foreach (var selected in _selectedPackages.ToList())
+        {
+            var package = _availablePackages.FirstOrDefault(pkg => string.Equals(pkg.Id, selected, StringComparison.OrdinalIgnoreCase));
+            if (package is null)
+            {
+                continue;
+            }
+
+            foreach (var dependency in package.Dependencies)
+            {
+                if (!_selectedPackages.Contains(dependency))
+                {
+                    _selectedPackages.Add(dependency);
+                }
+
+                if (!_forcedBy.TryGetValue(dependency, out var forcedBy))
+                {
+                    forcedBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    _forcedBy[dependency] = forcedBy;
+                }
+
+                forcedBy.Add(package.Id);
+            }
+        }
+    }
+
+    private void SelectAllPackages()
+    {
+        _selectedPackages = _availablePackages.Select(pkg => pkg.Id).ToList();
+        NormalizeForcedDependencies();
+    }
+
+    private void UnselectAllPackages()
+    {
+        _selectedPackages.Clear();
+        _forcedBy.Clear();
+    }
+
+    private string GetPackageStatusText(string packageId)
+    {
+        if (_forcedBy.TryGetValue(packageId, out var forcedBy) && forcedBy.Count > 0)
+        {
+            return $"[!] Required by {string.Join(", ", forcedBy.OrderBy(x => x))}";
+        }
+
+        if (_selectedPackages.Contains(packageId))
+        {
+            return "[X] Selected";
+        }
+
+        return "[ ] Optional";
+    }
+
+    private string GetForcedByText(string packageId)
+    {
+        if (_forcedBy.TryGetValue(packageId, out var forcedBy) && forcedBy.Count > 0)
+        {
+            return $"Required by: {string.Join(", ", forcedBy.OrderBy(x => x))}";
+        }
+
+        return string.Empty;
+    }
+
+    private string GetForcedSuffix(string packageId)
+    {
+        return _forcedBy.TryGetValue(packageId, out var forcedBy) && forcedBy.Count > 0
+            ? $" [required by {string.Join(", ", forcedBy.OrderBy(x => x))}]"
+            : string.Empty;
     }
 
     private void RunUninstallFlow()
@@ -734,6 +981,7 @@ internal sealed class InstallerApp
     };
 }
 
+internal sealed record PackageRow(CheckBox Toggle, Label Status, int AbsoluteIndex);
 internal sealed record GitTag(string Name);
 internal sealed record GitCommit(string Sha);
 internal sealed record InstalledState(string Version, string AgentType, List<string> Packages, string Timestamp);
