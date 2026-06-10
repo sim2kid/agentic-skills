@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Text.Json;
-using NStack;
 using Terminal.Gui;
 
 var installer = new InstallerApp();
@@ -12,6 +11,9 @@ internal sealed class InstallerApp
     private const string RepoName = "agentic-skills";
     private const string StateFile = ".agents/agent-packages-installed.json";
     private const string DefaultAgentType = "OpenCode";
+    private const int ShellWidth = 100;
+    private const int ShellHeight = 30;
+    private const int ButtonRowY = 22;
 
     private readonly HttpClient _httpClient = new();
     private readonly string _workspaceRoot = Environment.CurrentDirectory;
@@ -57,8 +59,8 @@ internal sealed class InstallerApp
         {
             X = Pos.Center(),
             Y = Pos.Center(),
-            Width = 100,
-            Height = 30
+            Width = ShellWidth,
+            Height = ShellHeight
         };
 
         _window.KeyPress += HandleGlobalKeyPress;
@@ -135,21 +137,12 @@ internal sealed class InstallerApp
             return;
         }
 
-        foreach (var subview in _contentFrame.Subviews)
-        {
-            if (subview.CanFocus)
-            {
-                _contentFrame.FocusFirst();
-                break;
-            }
-        }
+        _contentFrame.FocusFirst();
     }
 
     private void ShowMainMenu()
     {
         var state = LoadState();
-        var installButton = CreateButton(28, 8, "_Install / Update", StartInstallWizard);
-        var uninstallButton = CreateButton(52, 8, "_Uninstall", RunUninstallFlow);
 
         _window!.KeyPress -= MainMenuKeyPress;
         _window.KeyPress += MainMenuKeyPress;
@@ -159,8 +152,8 @@ internal sealed class InstallerApp
             new Label(28, 4, "Choose what you want to do."),
             new Label(28, 5, "Hotkeys: I = Install/Update, U = Uninstall, Ctrl+C = Exit"),
             new Label(28, 6, state is null ? "No previous installation found." : "Existing installation detected."),
-            installButton,
-            uninstallButton);
+            CreateButton(28, ButtonRowY, "_Install / Update", StartInstallWizard),
+            CreateButton(52, ButtonRowY, "_Uninstall", RunUninstallFlow));
     }
 
     private void MainMenuKeyPress(View.KeyEventEventArgs args)
@@ -187,7 +180,7 @@ internal sealed class InstallerApp
     private void ShowAgentTypeStep()
     {
         var options = new List<string> { DefaultAgentType };
-        var listView = CreateListView(options, _agentTypeIndex, 4, 10);
+        var listView = CreateListView(options, _agentTypeIndex, 4, 12);
         listView.SelectedItemChanged += args => _agentTypeIndex = args.Item;
 
         _window!.KeyPress -= AgentTypeKeyPress;
@@ -198,14 +191,14 @@ internal sealed class InstallerApp
             new Label(2, 1, "Select the agent platform you want to install these packages into."),
             new Label(2, 2, "Available agent types:"),
             listView,
-            CreateButton(32, 17, "_Next", () =>
+            CreateButton(32, ButtonRowY, "_Next", () =>
             {
                 _selectedAgentType = options[listView.SelectedItem];
                 _agentTypeIndex = listView.SelectedItem;
                 _window!.KeyPress -= AgentTypeKeyPress;
                 ShowVersionStep();
             }),
-            CreateButton(48, 17, "_Cancel", () =>
+            CreateButton(48, ButtonRowY, "_Back", () =>
             {
                 _window!.KeyPress -= AgentTypeKeyPress;
                 ShowMainMenu();
@@ -214,16 +207,16 @@ internal sealed class InstallerApp
 
     private void AgentTypeKeyPress(View.KeyEventEventArgs args)
     {
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            FocusInvoke("_Next");
+            ActivateButtonByText("_Next");
         }
 
         if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
         {
             args.Handled = true;
-            FocusInvoke("_Cancel");
+            ActivateButtonByText("_Back");
         }
     }
 
@@ -242,14 +235,14 @@ internal sealed class InstallerApp
             new Label(2, 1, "Select the version to install. `latest` uses the head of the main branch."),
             new Label(2, 2, "Available versions:"),
             listView,
-            CreateButton(30, 19, "_Next", () =>
+            CreateButton(30, ButtonRowY, "_Next", () =>
             {
                 _selectedVersion = versions[listView.SelectedItem];
                 _versionIndex = listView.SelectedItem;
                 _window!.KeyPress -= VersionKeyPress;
                 ShowPackagesStep();
             }),
-            CreateButton(46, 19, "_Back", () =>
+            CreateButton(46, ButtonRowY, "_Back", () =>
             {
                 _window!.KeyPress -= VersionKeyPress;
                 ShowAgentTypeStep();
@@ -258,16 +251,16 @@ internal sealed class InstallerApp
 
     private void VersionKeyPress(View.KeyEventEventArgs args)
     {
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            FocusInvoke("_Next");
+            ActivateButtonByText("_Next");
         }
 
-        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
+        if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b || args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
         {
             args.Handled = true;
-            FocusInvoke("_Back");
+            ActivateButtonByText("_Back");
         }
     }
 
@@ -296,7 +289,7 @@ internal sealed class InstallerApp
         var views = new List<View>
         {
             new Label(2, 1, "Select the packages to install for the chosen version."),
-            new Label(2, 2, "Use space to toggle items. A = Select All, U = Unselect All, N = Next, B = Back")
+            new Label(2, 2, "Use space to toggle items. A = Select All, U = Unselect All, N/Enter = Next, B = Back")
         };
 
         for (var i = 0; i < _availablePackages.Count; i++)
@@ -306,9 +299,9 @@ internal sealed class InstallerApp
             {
                 Checked = _selectedPackages.Contains(package.Id)
             };
+            checkBoxes.Add(checkBox);
             views.Add(checkBox);
             views.Add(new Label(28, i + 4, package.Description));
-            checkBoxes.Add(checkBox);
         }
 
         void SyncSelection()
@@ -329,24 +322,19 @@ internal sealed class InstallerApp
             SyncSelection();
         }
 
-        var selectAllButton = CreateButton(2, _availablePackages.Count + 6, "Select _All", () => SetAll(true));
-        var unselectAllButton = CreateButton(16, _availablePackages.Count + 6, "_Unselect All", () => SetAll(false));
-        var nextButton = CreateButton(40, _availablePackages.Count + 6, "_Next", () =>
+        views.Add(CreateButton(2, ButtonRowY, "Select _All", () => SetAll(true)));
+        views.Add(CreateButton(16, ButtonRowY, "_Unselect All", () => SetAll(false)));
+        views.Add(CreateButton(40, ButtonRowY, "_Next", () =>
         {
             SyncSelection();
             ShowReviewStep();
-        });
-        var backButton = CreateButton(52, _availablePackages.Count + 6, "_Back", () =>
+        }));
+        views.Add(CreateButton(52, ButtonRowY, "_Back", () =>
         {
             SyncSelection();
             _window!.KeyPress -= PackagesKeyPress;
             ShowVersionStep();
-        });
-
-        views.Add(selectAllButton);
-        views.Add(unselectAllButton);
-        views.Add(nextButton);
-        views.Add(backButton);
+        }));
 
         _window!.KeyPress -= PackagesKeyPress;
         _window.KeyPress += PackagesKeyPress;
@@ -358,25 +346,25 @@ internal sealed class InstallerApp
         if (args.KeyEvent.Key == Key.A || args.KeyEvent.Key == Key.a)
         {
             args.Handled = true;
-            FocusInvoke("Select _All");
+            ActivateButtonByText("Select _All");
         }
 
         if (args.KeyEvent.Key == Key.U || args.KeyEvent.Key == Key.u)
         {
             args.Handled = true;
-            FocusInvoke("_Unselect All");
+            ActivateButtonByText("_Unselect All");
         }
 
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            FocusInvoke("_Next");
+            ActivateButtonByText("_Next");
         }
 
         if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
         {
             args.Handled = true;
-            FocusInvoke("_Back");
+            ActivateButtonByText("_Back");
         }
     }
 
@@ -407,8 +395,8 @@ internal sealed class InstallerApp
                 WordWrap = false,
                 Text = string.Join(Environment.NewLine, lines)
             },
-            CreateButton(26, 19, "_Confirm and Install", ConfirmInstall),
-            CreateButton(52, 19, "_Back", () =>
+            CreateButton(26, ButtonRowY, "_Confirm and Install", ConfirmInstall),
+            CreateButton(52, ButtonRowY, "_Back", () =>
             {
                 _window!.KeyPress -= ReviewKeyPress;
                 ShowPackagesStep();
@@ -417,16 +405,16 @@ internal sealed class InstallerApp
 
     private void ReviewKeyPress(View.KeyEventEventArgs args)
     {
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
+        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            FocusInvoke("_Confirm and Install");
+            ActivateButtonByText("_Confirm and Install");
         }
 
         if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
         {
             args.Handled = true;
-            FocusInvoke("_Back");
+            ActivateButtonByText("_Back");
         }
     }
 
@@ -434,8 +422,7 @@ internal sealed class InstallerApp
     {
         try
         {
-            var previousState = LoadState();
-            if (previousState is not null)
+            if (LoadState() is not null)
             {
                 RemoveExistingInstallationArtifacts();
             }
@@ -709,7 +696,7 @@ internal sealed class InstallerApp
         return button;
     }
 
-    private void FocusInvoke(string buttonText)
+    private void ActivateButtonByText(string buttonText)
     {
         if (_contentFrame is null)
         {
@@ -728,6 +715,7 @@ internal sealed class InstallerApp
         }
 
         Directory.CreateDirectory(destinationDir);
+
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             File.Copy(file, Path.Combine(destinationDir, Path.GetFileName(file)), true);
