@@ -3,31 +3,16 @@
 $repoOwner = "sim2kid"
 $repoName = "agentic-skills"
 
-function Get-RepoRoot {
-    $searchRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
-        (Get-Location).Path
-    } else {
-        $PSScriptRoot
-    }
-
-    $checkPath = Join-Path $searchRoot "packages.json"
-    if (Test-Path -LiteralPath $checkPath) {
-        return $searchRoot
-    }
-
-    $parent = Split-Path $searchRoot -Parent
-    while (-not [string]::IsNullOrWhiteSpace($parent)) {
-        $checkPath = Join-Path $parent "packages.json"
-        if (Test-Path -LiteralPath $checkPath) {
-            return $parent
-        }
-        $parent = Split-Path $parent -Parent
-    }
-
-    return $null
+if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+    $bootstrapUrl = "https://raw.githubusercontent.com/$repoOwner/$repoName/main/install-tui.ps1"
+    $tempScript = Join-Path $env:TEMP "agentic-skills-install-tui-$(Get-Random).ps1"
+    Invoke-WebRequest -Uri $bootstrapUrl -OutFile $tempScript -ErrorAction Stop
+    & powershell -ExecutionPolicy Bypass -File $tempScript
+    exit $LASTEXITCODE
 }
 
-$repoRoot = Get-RepoRoot
+$repoRoot = $PSScriptRoot
+$projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
 
 function Show-Welcome {
     Clear-Host
@@ -40,13 +25,6 @@ function Show-Welcome {
 }
 
 Show-Welcome
-
-if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-    Write-Error "Could not find repository root (packages.json not found in any parent directory)."
-    exit 1
-}
-
-$projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
 
 if (-not (Test-Path -LiteralPath $projectPath)) {
     Write-Error "TUI installer project not found at: $projectPath"
