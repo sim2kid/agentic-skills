@@ -25,10 +25,5 @@
       "description": "Specialized support package containing DevOps and Security agents for infrastructure, observability, threat modeling, and compliance auditing.",
       "dependencies": ["foundation", "studio-authoring", "core", "execution-operations"]
     },
-    {
-      "id": "example-pkg",
-      "description": "Example package containing both skill and agent",
-      "dependencies": []
-    }
   ]
 }
