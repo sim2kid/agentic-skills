@@ -572,8 +572,11 @@ internal sealed class InstallerApp
             DeployPackages(_selectedVersion, _selectedPackages);
 
             _window!.KeyPress -= ReviewKeyPress;
-            MessageBox.Query("Installer", $"Installation complete.\nVersion: {savedVersion}\nAgent: {_selectedAgentType}", "OK");
-            ShowMainMenu();
+            var close = MessageBox.Query("Installer", $"Installation complete.\nVersion: {savedVersion}\nAgent: {_selectedAgentType}", "_Close");
+            if (close == 0)
+            {
+                Application.RequestStop();
+            }
         }
         catch (Exception ex)
         {
