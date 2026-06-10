@@ -46,6 +46,7 @@ Author a high-quality OpenCode `AGENT.md` that defines a focused specialist with
 - Use a valid `AGENT.md` with frontmatter such as:
   - `description`
   - `mode: subagent`
+  - `model`
 - Keep the body as the prompt content.
 - Prefer file-based sub-agents under `packages/<package>/sub-agents/<agent-name>/AGENT.md` in this repository structure.
 
