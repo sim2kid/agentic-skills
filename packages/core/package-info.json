@@ -1,6 +1,6 @@
 {
   "id": "core",
-  "name": "Core Package",
-  "description": "The base package containing essential sub-agents and skills for the software studio.",
+  "name": "Core Triad",
+  "description": "The foundational package containing the core Triad sub-agents and their reusable collaboration skills.",
   "dependencies": []
 }
