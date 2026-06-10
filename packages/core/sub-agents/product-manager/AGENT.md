@@ -1,7 +1,6 @@
 ---
 description: Lead Product Manager for defining product scope, requirements, and acceptance criteria within the Core Triad.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

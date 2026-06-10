@@ -1,7 +1,6 @@
 ---
 description: PR Writer for translating diffs and commits into reviewer-ready pull request descriptions in the Git Writing package.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

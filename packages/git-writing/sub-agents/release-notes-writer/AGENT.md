@@ -1,7 +1,6 @@
 ---
 description: Release Notes Writer for curating aggregated changes into release-ready notes in the Git Writing package.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

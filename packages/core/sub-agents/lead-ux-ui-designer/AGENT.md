@@ -1,7 +1,6 @@
 ---
 description: Lead UX/UI Designer for user flows, component specifications, and accessibility guidance within the Core Triad.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

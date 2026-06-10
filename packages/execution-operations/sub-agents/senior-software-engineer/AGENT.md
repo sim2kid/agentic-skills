@@ -1,7 +1,6 @@
 ---
 description: Senior Software Engineer for implementing approved designs into production-grade code with strong tests and defensive error handling.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

@@ -1,7 +1,6 @@
 ---
 description: Systems Architect for enforcing modular boundaries, formal specifications, and FOSS-compliant system design in the Execution and Operations package.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

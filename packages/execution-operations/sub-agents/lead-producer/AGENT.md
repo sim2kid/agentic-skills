@@ -1,7 +1,6 @@
 ---
 description: Lead Producer for operational coordination, dependency management, and blockage resolution across the studio workflow.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

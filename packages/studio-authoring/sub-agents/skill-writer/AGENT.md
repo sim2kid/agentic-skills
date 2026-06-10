@@ -1,7 +1,6 @@
 ---
 description: Skill Writer for authoring narrow, reusable, OpenCode-compliant skills with strong discovery metadata, workflows, and validation.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

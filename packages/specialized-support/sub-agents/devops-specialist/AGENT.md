@@ -1,7 +1,6 @@
 ---
 description: DevOps Specialist for infrastructure automation, deployment pipelines, environment parity, and observability in the Specialized Support package.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

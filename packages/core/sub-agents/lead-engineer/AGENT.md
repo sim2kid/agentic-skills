@@ -1,7 +1,6 @@
 ---
 description: Lead Engineer and Systems Architect for technical design, feasibility decisions, and engineering governance within the Core Triad.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

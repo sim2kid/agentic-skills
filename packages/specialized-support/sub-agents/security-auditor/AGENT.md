@@ -1,7 +1,6 @@
 ---
 description: Security Auditor for threat modeling, vulnerability review, compliance auditing, and hardening guidance in the Specialized Support package.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 

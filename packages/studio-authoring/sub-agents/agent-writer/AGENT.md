@@ -1,7 +1,6 @@
 ---
 description: Agent Writer for authoring focused, bounded OpenCode sub-agents with clear ownership, inputs, outputs, and curated skill usage.
 mode: subagent
-model: openai/gpt-5.4
 temperature: 0.2
 ---
 
