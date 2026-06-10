@@ -40,9 +40,10 @@ function Select-AgentType {
 }
 
 function Select-Version {
-    $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/tags"
+    $tagsUrl = "https://api.github.com/repos/$repoOwner/$repoName/tags"
+    
     try {
-        $tags = Invoke-RestMethod -Uri $apiUrl
+        $tags = Invoke-RestMethod -Uri $tagsUrl -ErrorAction Stop
         $versions = @("latest")
         if ($tags -and $tags.Count -gt 0) {
             foreach ($tag in $tags) {
@@ -63,19 +64,50 @@ function Select-Version {
     }
 }
 
+function Get-LocalVersionLabel {
+    $tagsUrl = "https://api.github.com/repos/$repoOwner/$repoName/tags"
+    $commitsUrl = "https://api.github.com/repos/$repoOwner/$repoName/commits"
+    
+    try {
+        $tags = Invoke-RestMethod -Uri $tagsUrl -ErrorAction Stop
+        $latestTag = if ($tags -and $tags.Count -gt 0) { $tags[0].name } else { "0.1.0" }
+        
+        $commits = Invoke-RestMethod -Uri $commitsUrl -ErrorAction Stop
+        $shortSha = $commits[0].sha.Substring(0, 6)
+        
+        return "$latestTag-$shortSha"
+    } catch {
+        return "0.1.0"
+    }
+}
+
 function Get-PackageMetadata ($version) {
     if ($env:LOCAL_TEST_MODE -eq "true") {
         return Get-Content -Raw -LiteralPath "packages.json" | ConvertFrom-Json
     }
 
     $branch = if ($version -eq "latest") { "main" } else { $version }
+    # Use 'main' as fallback if $version is 'latest' but 'main' doesn't exist, 
+    # though usually 'latest' maps to 'main' in this script.
     $url = "https://raw.githubusercontent.com/$repoOwner/$repoName/$branch/packages.json"
     try {
         $response = Invoke-WebRequest -Uri $url -ErrorAction Stop
         return $response.Content | ConvertFrom-Json
     } catch {
-        Write-Error "Failed to fetch packages.json: $($_.Exception.Message)"
-        exit 1
+        if ($branch -ne "main") {
+            Write-Warning "Could not find packages.json on branch $branch, trying 'main'..."
+            $url = "https://raw.githubusercontent.com/$repoOwner/$repoName/main/packages.json"
+            try {
+                $response = Invoke-WebRequest -Uri $url -ErrorAction Stop
+                return $response.Content | ConvertFrom-Json
+            } catch {
+                Write-Error "Failed to fetch packages.json from both $branch and main: $($_.Exception.Message)"
+                exit 1
+            }
+        } else {
+            Write-Error "Failed to fetch packages.json: $($_.Exception.Message)"
+            exit 1
+        }
     }
 }
 
@@ -219,13 +251,18 @@ if ($action -eq 1) {
 $agentType = Select-AgentType
 $version = Select-Version
 $metadata = Get-PackageMetadata $version
+
+# Generate a local version label for state tracking (tag + commit sha)
+$localVersion = Get-LocalVersionLabel
+$displayVersion = if ($version -eq "latest") { "latest ($localVersion)" } else { $version }
+Write-Host "`nInstalling version: $displayVersion" -ForegroundColor Cyan
 $selected = Select-Packages $metadata
 
 Cleanup-Existing
 Deploy-Packages $version $selected $metadata
 
 $newState = @{
-    version = $version
+    version = $displayVersion
     agentType = $agentType
     packages = $selected
     timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
