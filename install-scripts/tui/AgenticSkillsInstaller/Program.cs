@@ -14,7 +14,7 @@ internal sealed class InstallerApp
     private const string DefaultAgentType = "OpenCode";
     private const int ShellWidth = 100;
     private const int ShellHeight = 32;
-    private const int ButtonRowY = 22;
+    private const int ButtonRowY = 21;
     private const int PackagePageSize = 8;
 
     private readonly HttpClient _httpClient = new();
