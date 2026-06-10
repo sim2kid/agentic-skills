@@ -1,7 +1,7 @@
 # Install Script for Agentic Skills
 # This script allows users to install specific skills and agents into their repository.
 
-$repoOwner = "anomalyco"
+$repoOwner = "sim2kid"
 $repoName = "agentic-skills"
 $stateFile = ".agents/agent-packages-installed.json"
 
