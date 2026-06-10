@@ -2,5 +2,5 @@
   "id": "core",
   "name": "Core Triad",
   "description": "The foundational package containing the core Triad sub-agents and their reusable collaboration skills.",
-  "dependencies": ["foundation"]
+  "dependencies": ["foundation", "studio-authoring"]
 }

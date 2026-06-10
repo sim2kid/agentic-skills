@@ -6,19 +6,24 @@
       "dependencies": []
     },
     {
+      "id": "studio-authoring",
+      "description": "Authoring package containing specialist agents and skills for writing high-quality OpenCode skills and sub-agents.",
+      "dependencies": ["foundation"]
+    },
+    {
       "id": "core",
       "description": "Core Triad package containing the Product Manager, Lead Engineer, Lead UX/UI Designer, and foundational triad skills.",
-      "dependencies": ["foundation"]
+      "dependencies": ["foundation", "studio-authoring"]
     },
     {
       "id": "execution-operations",
       "description": "Execution and Operations package containing delivery, architecture, QA, and workflow orchestration agents with supporting skills.",
-      "dependencies": ["foundation", "core"]
+      "dependencies": ["foundation", "studio-authoring", "core"]
     },
     {
       "id": "specialized-support",
       "description": "Specialized support package containing DevOps and Security agents for infrastructure, observability, threat modeling, and compliance auditing.",
-      "dependencies": ["foundation", "core", "execution-operations"]
+      "dependencies": ["foundation", "studio-authoring", "core", "execution-operations"]
     },
     {
       "id": "example-pkg",

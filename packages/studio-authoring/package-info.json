@@ -1,0 +1,6 @@
+{
+  "id": "studio-authoring",
+  "name": "Studio Authoring",
+  "description": "Specialist authoring package for creating high-quality OpenCode skills and sub-agents for the studio.",
+  "dependencies": ["foundation"]
+}
