@@ -851,7 +851,7 @@ internal sealed class InstallerApp
         if (Environment.GetEnvironmentVariable("LOCAL_TEST_MODE") == "true")
         {
             var localPath = Path.Combine(_workspaceRoot, "packages.json");
-            return JsonSerializer.Deserialize<PackageMetadata>(File.ReadAllText(localPath), JsonOptions())
+            return JsonSerializer.Deserialize<PackageMetadata>(File.ReadAllText(localPath), PackageJsonOptions())
                 ?? throw new InvalidOperationException("Failed to read local packages.json.");
         }
 
@@ -868,12 +868,12 @@ internal sealed class InstallerApp
             fallbackRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
             var fallbackResponse = _httpClient.Send(fallbackRequest);
             fallbackResponse.EnsureSuccessStatusCode();
-            return JsonSerializer.Deserialize<PackageMetadata>(fallbackResponse.Content.ReadAsStringAsync().Result, JsonOptions())
+            return JsonSerializer.Deserialize<PackageMetadata>(fallbackResponse.Content.ReadAsStringAsync().Result, PackageJsonOptions())
                 ?? throw new InvalidOperationException("Failed to parse packages.json from main.");
         }
 
         response.EnsureSuccessStatusCode();
-        return JsonSerializer.Deserialize<PackageMetadata>(response.Content.ReadAsStringAsync().Result, JsonOptions())
+        return JsonSerializer.Deserialize<PackageMetadata>(response.Content.ReadAsStringAsync().Result, PackageJsonOptions())
             ?? throw new InvalidOperationException("Failed to parse packages.json.");
     }
 
@@ -1055,6 +1055,12 @@ internal sealed class InstallerApp
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
+    };
+
+    private static JsonSerializerOptions PackageJsonOptions() => new()
+    {
+        PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true
     };
 }
 
