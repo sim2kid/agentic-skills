@@ -14,7 +14,7 @@ internal sealed class InstallerApp
     private const string DefaultAgentType = "OpenCode";
     private const int ShellWidth = 100;
     private const int ShellHeight = 32;
-    private const int ButtonRowY = 19;
+    private const int ButtonRowY = 22;
     private const int PackagePageSize = 8;
 
     private readonly HttpClient _httpClient = new();
@@ -212,14 +212,21 @@ internal sealed class InstallerApp
         if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            ActivateButtonByText("_Next");
+            AdvanceAgentType();
         }
 
         if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c || args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
         {
             args.Handled = true;
-            ActivateButtonByText("_Back");
+            ShowMainMenu();
         }
+    }
+
+    private void AdvanceAgentType()
+    {
+        var options = new List<string> { DefaultAgentType };
+        _selectedAgentType = options[Math.Clamp(_agentTypeIndex, 0, options.Count - 1)];
+        ShowVersionStep();
     }
 
     private void ShowVersionStep()
@@ -259,14 +266,26 @@ internal sealed class InstallerApp
         if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
-            ActivateButtonByText("_Next");
+            AdvanceVersion();
         }
 
         if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b || args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c)
         {
             args.Handled = true;
-            ActivateButtonByText("_Back");
+            ShowAgentTypeStep();
         }
+    }
+
+    private void AdvanceVersion()
+    {
+        var versions = GetVersions();
+        if (versions.Count == 0)
+        {
+            versions = new List<string> { "latest" };
+        }
+
+        _selectedVersion = versions[Math.Clamp(_versionIndex, 0, versions.Count - 1)];
+        ShowPackagesStep();
     }
 
     private void ShowPackagesStep()
