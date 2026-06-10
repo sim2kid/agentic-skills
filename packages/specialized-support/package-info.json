@@ -1,0 +1,6 @@
+{
+  "id": "specialized-support",
+  "name": "Specialized Support",
+  "description": "The specialized support package containing DevOps and Security agents for deployment reliability, observability, and security assurance.",
+  "dependencies": ["core", "execution-operations"]
+}
