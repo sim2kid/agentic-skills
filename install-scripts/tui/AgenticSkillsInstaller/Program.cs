@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Terminal.Gui;
 
@@ -10,9 +9,13 @@ internal sealed class InstallerApp
     private const string RepoOwner = "sim2kid";
     private const string RepoName = "agentic-skills";
     private const string StateFile = ".agents/agent-packages-installed.json";
+    private const string DefaultAgentType = "OpenCode";
 
     private readonly HttpClient _httpClient = new();
-    private readonly string _workspaceRoot = FindWorkspaceRoot();
+    private readonly string _workspaceRoot = Environment.CurrentDirectory;
+
+    private string _agentType = DefaultAgentType;
+    private string _selectedVersion = "latest";
 
     public void Run()
     {
@@ -20,7 +23,7 @@ internal sealed class InstallerApp
 
         try
         {
-            ShowMainWindow();
+            ShowMainMenu();
             Application.Run();
         }
         finally
@@ -30,51 +33,73 @@ internal sealed class InstallerApp
         }
     }
 
-    private void ShowMainWindow()
+    private void ShowMainMenu()
     {
         var state = LoadState();
         var currentVersion = state?.Version ?? "None";
+        var currentAgent = state?.AgentType ?? "None";
         var actionLabel = currentVersion == "None" ? "Install" : "Install / Update";
 
-        var window = new Window("Agentic Skills Installer")
+        var window = CreateCenteredWindow("Agentic Skills Installer", 78, 20);
+        AddHeader(window, currentVersion, currentAgent);
+
+        var installButton = new Button("_Install / Update")
         {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill()
+            X = Pos.Center() - 18,
+            Y = 10,
+            IsDefault = true
         };
+        installButton.Clicked += () => StartInstallWizard();
 
-        window.Add(new Label(2, 1, "Agentic Skills Installation"));
-        window.Add(new Label(2, 3, $"Target Repo: {RepoOwner}/{RepoName}"));
-        window.Add(new Label(2, 4, $"Workspace: {_workspaceRoot}"));
-        window.Add(new Label(2, 5, $"Current Installed Version: {currentVersion}"));
+        var uninstallButton = new Button("_Uninstall")
+        {
+            X = Pos.Center() + 4,
+            Y = 10
+        };
+        uninstallButton.Clicked += RunUninstallFlow;
 
-        var installButton = new Button(2, 8, actionLabel);
-        installButton.Clicked += () => RunInstallFlow(window);
-
-        var uninstallButton = new Button(24, 8, "Uninstall");
-        uninstallButton.Clicked += () => RunUninstallFlow();
-
-        var quitButton = new Button(2, 12, "Quit");
+        var quitButton = new Button("_Quit")
+        {
+            X = Pos.Center() - 4,
+            Y = 13
+        };
         quitButton.Clicked += () => Application.RequestStop();
 
-        window.Add(installButton, uninstallButton, quitButton);
-        Application.Top.RemoveAll();
-        Application.Top.Add(window);
+        window.Add(
+            new Label("Use keyboard shortcuts or mouse to continue.")
+            {
+                X = Pos.Center() - 21,
+                Y = 8
+            },
+            installButton,
+            uninstallButton,
+            quitButton);
+
+        ReplaceTop(window);
     }
 
-    private void RunInstallFlow(Window parent)
+    private void StartInstallWizard()
     {
-        var selectedVersion = SelectVersion();
-        if (selectedVersion is null)
+        var agentType = SelectAgentType();
+        if (agentType is null)
         {
             return;
         }
 
+        _agentType = agentType;
+
+        var version = SelectVersion();
+        if (version is null)
+        {
+            return;
+        }
+
+        _selectedVersion = version;
+
         PackageMetadata metadata;
         try
         {
-            metadata = GetPackageMetadata(selectedVersion);
+            metadata = GetPackageMetadata(version);
         }
         catch (Exception ex)
         {
@@ -90,15 +115,19 @@ internal sealed class InstallerApp
 
         try
         {
-            CleanupExisting();
-            DeployPackages(selectedVersion, selectedPackages);
+            var previousState = LoadState();
+            if (previousState is not null)
+            {
+                RemovePreviouslyInstalledPackages(previousState);
+            }
 
-            var localVersion = GetLocalVersionLabel();
-            var displayVersion = selectedVersion == "latest" ? $"latest ({localVersion})" : selectedVersion;
-            SaveState(new InstalledState(displayVersion, "OpenCode", selectedPackages, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
+            var savedVersion = version == "latest" ? GetLocalVersionLabel() : version;
+            var newState = new InstalledState(savedVersion, _agentType, selectedPackages, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            SaveState(newState);
+            DeployPackages(version, selectedPackages);
 
-            MessageBox.Query("Installer", $"Installation complete.\nInstalled version: {displayVersion}", "OK");
-            ShowMainWindow();
+            MessageBox.Query("Installer", $"Installation complete.\nVersion: {savedVersion}\nAgent: {_agentType}", "OK");
+            ShowMainMenu();
         }
         catch (Exception ex)
         {
@@ -108,17 +137,17 @@ internal sealed class InstallerApp
 
     private void RunUninstallFlow()
     {
-        if (MessageBox.Query("Uninstall", "Remove installed skills and agents?", "Yes", "No") != 0)
+        if (MessageBox.Query("Uninstall", "Remove installed skills and agents?", "_Yes", "_No") != 0)
         {
             return;
         }
 
         try
         {
-            var opencodePath = Path.Combine(_workspaceRoot, ".opencode");
-            if (Directory.Exists(opencodePath))
+            var state = LoadState();
+            if (state is not null)
             {
-                Directory.Delete(opencodePath, true);
+                RemovePreviouslyInstalledPackages(state);
             }
 
             var statePath = Path.Combine(_workspaceRoot, StateFile);
@@ -128,7 +157,7 @@ internal sealed class InstallerApp
             }
 
             MessageBox.Query("Uninstall", "Successfully uninstalled all packages.", "OK");
-            ShowMainWindow();
+            ShowMainMenu();
         }
         catch (Exception ex)
         {
@@ -136,33 +165,68 @@ internal sealed class InstallerApp
         }
     }
 
+    private string? SelectAgentType()
+    {
+        var dialog = CreateCenteredDialog("Select Agent Type", 60, 16);
+        var options = new List<string> { DefaultAgentType };
+        var listView = new ListView(options)
+        {
+            X = 2,
+            Y = 4,
+            Width = Dim.Fill() - 4,
+            Height = 4
+        };
+
+        dialog.Add(CreateHeaderView("Agent Type", LoadState()?.Version ?? "None", _agentType));
+        dialog.Add(new Label("Choose the agent platform to install into.") { X = Pos.Center() - 20, Y = 2 });
+        dialog.Add(listView);
+
+        string? selected = null;
+        var nextButton = new Button("_Next", is_default: true);
+        nextButton.Clicked += () =>
+        {
+            selected = options[listView.SelectedItem];
+            Application.RequestStop();
+        };
+
+        var cancelButton = new Button("_Cancel");
+        cancelButton.Clicked += () => Application.RequestStop();
+
+        dialog.AddButton(nextButton);
+        dialog.AddButton(cancelButton);
+        Application.Run(dialog);
+        return selected;
+    }
+
     private string? SelectVersion()
     {
         var versions = GetVersions();
-        var dialog = new Dialog("Select Version", 70, 20);
+        var dialog = CreateCenteredDialog("Select Version", 72, 20);
         var listView = new ListView(versions)
         {
-            X = 1,
-            Y = 1,
-            Width = Dim.Fill() - 2,
-            Height = Dim.Fill() - 4
+            X = 2,
+            Y = 4,
+            Width = Dim.Fill() - 4,
+            Height = 9
         };
 
+        dialog.Add(CreateHeaderView("Version", LoadState()?.Version ?? "None", _agentType));
+        dialog.Add(new Label("Choose `latest` or a specific tag.") { X = Pos.Center() - 17, Y = 2 });
+        dialog.Add(listView);
+
         string? selected = null;
-        var okButton = new Button("OK", is_default: true);
-        okButton.Clicked += () =>
+        var nextButton = new Button("_Next", is_default: true);
+        nextButton.Clicked += () =>
         {
             selected = versions[listView.SelectedItem];
             Application.RequestStop();
         };
 
-        var cancelButton = new Button("Cancel");
-        cancelButton.Clicked += () => Application.RequestStop();
+        var backButton = new Button("_Back");
+        backButton.Clicked += () => Application.RequestStop();
 
-        dialog.Add(listView);
-        dialog.AddButton(okButton);
-        dialog.AddButton(cancelButton);
-
+        dialog.AddButton(nextButton);
+        dialog.AddButton(backButton);
         Application.Run(dialog);
         return selected;
     }
@@ -170,26 +234,27 @@ internal sealed class InstallerApp
     private List<string>? SelectPackages(PackageMetadata metadata)
     {
         var previous = LoadState()?.Packages ?? new List<string>();
-        var dialog = new Dialog("Select Packages", 90, 24);
+        var dialog = CreateCenteredDialog("Select Packages", 96, Math.Min(26, metadata.Packages.Count + 10));
+        dialog.Add(CreateHeaderView("Packages", LoadState()?.Version ?? "None", _agentType));
+        dialog.Add(new Label($"Version: {_selectedVersion}") { X = 2, Y = 2 });
+        dialog.Add(new Label("Use space to toggle packages. Enter activates the default button.") { X = 2, Y = 3 });
+
         var checkBoxes = new List<CheckBox>();
-
-        dialog.Add(new Label(1, 1, "Toggle packages with mouse or keyboard. Dependencies are not auto-resolved yet."));
-
         for (var i = 0; i < metadata.Packages.Count; i++)
         {
             var package = metadata.Packages[i];
-            var checkBox = new CheckBox(1, i + 3, package.Id)
+            var checkBox = new CheckBox(2, i + 5, package.Id)
             {
                 Checked = previous.Count > 0 ? previous.Contains(package.Id) : true
             };
             dialog.Add(checkBox);
-            dialog.Add(new Label(24, i + 3, package.Description));
+            dialog.Add(new Label(28, i + 5, package.Description));
             checkBoxes.Add(checkBox);
         }
 
         List<string>? selected = null;
-        var okButton = new Button("Install", is_default: true);
-        okButton.Clicked += () =>
+        var installButton = new Button("_Install", is_default: true);
+        installButton.Clicked += () =>
         {
             selected = metadata.Packages
                 .Where((pkg, index) => checkBoxes[index].Checked)
@@ -198,12 +263,11 @@ internal sealed class InstallerApp
             Application.RequestStop();
         };
 
-        var cancelButton = new Button("Cancel");
-        cancelButton.Clicked += () => Application.RequestStop();
+        var backButton = new Button("_Back");
+        backButton.Clicked += () => Application.RequestStop();
 
-        dialog.AddButton(okButton);
-        dialog.AddButton(cancelButton);
-
+        dialog.AddButton(installButton);
+        dialog.AddButton(backButton);
         Application.Run(dialog);
         return selected;
     }
@@ -240,7 +304,7 @@ internal sealed class InstallerApp
             tagResponse.EnsureSuccessStatusCode();
             var tags = JsonSerializer.Deserialize<List<GitTag>>(tagResponse.Content.ReadAsStringAsync().Result, JsonOptions()) ?? new List<GitTag>();
 
-            using var commitRequest = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits/main?per_page=1");
+            using var commitRequest = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits/main");
             commitRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
             var commitResponse = _httpClient.Send(commitRequest);
             commitResponse.EnsureSuccessStatusCode();
@@ -274,9 +338,9 @@ internal sealed class InstallerApp
 
         if (!response.IsSuccessStatusCode && branch != "main")
         {
+            response.Dispose();
             using var fallbackRequest = new HttpRequestMessage(HttpMethod.Get, $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/packages.json");
             fallbackRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
-            response.Dispose();
             var fallbackResponse = _httpClient.Send(fallbackRequest);
             fallbackResponse.EnsureSuccessStatusCode();
             return JsonSerializer.Deserialize<PackageMetadata>(fallbackResponse.Content.ReadAsStringAsync().Result, JsonOptions())
@@ -288,19 +352,42 @@ internal sealed class InstallerApp
             ?? throw new InvalidOperationException("Failed to parse packages.json.");
     }
 
-    private void CleanupExisting()
+    private void RemovePreviouslyInstalledPackages(InstalledState state)
     {
-        var skillsPath = Path.Combine(_workspaceRoot, ".opencode", "skills");
-        var agentsPath = Path.Combine(_workspaceRoot, ".opencode", "agents");
-
-        if (Directory.Exists(skillsPath))
+        if (!string.Equals(state.AgentType, DefaultAgentType, StringComparison.OrdinalIgnoreCase))
         {
-            Directory.Delete(skillsPath, true);
+            throw new InvalidOperationException($"Unsupported agent type in state file: {state.AgentType}");
         }
 
-        if (Directory.Exists(agentsPath))
+        var skillsBase = Path.Combine(_workspaceRoot, ".opencode", "skills");
+        foreach (var packageId in state.Packages)
         {
-            Directory.Delete(agentsPath, true);
+            var installedPackageDir = Path.Combine(skillsBase, packageId);
+            if (Directory.Exists(installedPackageDir))
+            {
+                Directory.Delete(installedPackageDir, true);
+            }
+        }
+
+        var opencodePath = Path.Combine(_workspaceRoot, ".opencode");
+        if (Directory.Exists(opencodePath))
+        {
+            var skillsPath = Path.Combine(opencodePath, "skills");
+            var agentsPath = Path.Combine(opencodePath, "agents");
+            if (Directory.Exists(skillsPath) && !Directory.EnumerateFileSystemEntries(skillsPath).Any())
+            {
+                Directory.Delete(skillsPath, true);
+            }
+
+            if (Directory.Exists(agentsPath) && !Directory.EnumerateFileSystemEntries(agentsPath).Any())
+            {
+                Directory.Delete(agentsPath, true);
+            }
+
+            if (!Directory.EnumerateFileSystemEntries(opencodePath).Any())
+            {
+                Directory.Delete(opencodePath, true);
+            }
         }
     }
 
@@ -321,7 +408,7 @@ internal sealed class InstallerApp
                 var packageDir = Path.Combine(sourceRoot, "packages", packageId);
                 if (!Directory.Exists(packageDir))
                 {
-                    continue;
+                    throw new InvalidOperationException($"Package directory not found: {packageId}");
                 }
 
                 CopySkills(packageDir);
@@ -340,14 +427,28 @@ internal sealed class InstallerApp
     private string DownloadAndExtractSource(string branch, string tempDir)
     {
         var zipPath = Path.Combine(tempDir, "source.zip");
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/{branch}.zip");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/heads/{branch}.zip");
         request.Headers.Add("User-Agent", "AgenticSkillsInstaller");
         var response = _httpClient.Send(request);
-        response.EnsureSuccessStatusCode();
-        File.WriteAllBytes(zipPath, response.Content.ReadAsByteArrayAsync().Result);
+
+        if (!response.IsSuccessStatusCode && branch != "main")
+        {
+            response.Dispose();
+            using var fallbackRequest = new HttpRequestMessage(HttpMethod.Get, $"https://github.com/{RepoOwner}/{RepoName}/archive/refs/tags/{branch}.zip");
+            fallbackRequest.Headers.Add("User-Agent", "AgenticSkillsInstaller");
+            var fallbackResponse = _httpClient.Send(fallbackRequest);
+            fallbackResponse.EnsureSuccessStatusCode();
+            File.WriteAllBytes(zipPath, fallbackResponse.Content.ReadAsByteArrayAsync().Result);
+        }
+        else
+        {
+            response.EnsureSuccessStatusCode();
+            File.WriteAllBytes(zipPath, response.Content.ReadAsByteArrayAsync().Result);
+        }
 
         System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, tempDir, true);
-        return Directory.GetDirectories(tempDir).First(static path => Path.GetFileName(path) != ".git");
+        return Directory.GetDirectories(tempDir)
+            .First(path => !string.Equals(Path.GetFileName(path), ".git", StringComparison.OrdinalIgnoreCase));
     }
 
     private void CopySkills(string packageDir)
@@ -410,8 +511,63 @@ internal sealed class InstallerApp
         File.WriteAllText(statePath, JsonSerializer.Serialize(state, JsonOptions()));
     }
 
+    private Window CreateCenteredWindow(string title, int width, int height)
+    {
+        return new Window(title)
+        {
+            X = Pos.Center(),
+            Y = Pos.Center(),
+            Width = width,
+            Height = height
+        };
+    }
+
+    private Dialog CreateCenteredDialog(string title, int width, int height)
+    {
+        return new Dialog(title, width, height)
+        {
+            X = Pos.Center(),
+            Y = Pos.Center()
+        };
+    }
+
+    private void AddHeader(Window window, string currentVersion, string currentAgent)
+    {
+        window.Add(CreateHeaderView("Main Menu", currentVersion, currentAgent));
+    }
+
+    private View CreateHeaderView(string stepName, string currentVersion, string currentAgent)
+    {
+        var frame = new FrameView()
+        {
+            X = 1,
+            Y = 0,
+            Width = Dim.Fill() - 2,
+            Height = 5,
+            CanFocus = false,
+            Title = stepName
+        };
+
+        frame.Add(new Label($"Agentic Skills Installer") { X = 2, Y = 0 });
+        frame.Add(new Label($"Installed Version: {currentVersion}") { X = 2, Y = 1 });
+        frame.Add(new Label($"Agent Type: {currentAgent}") { X = 34, Y = 1 });
+        frame.Add(new Label($"Repo: {RepoOwner}/{RepoName}") { X = 2, Y = 2 });
+        return frame;
+    }
+
+    private void ReplaceTop(View view)
+    {
+        Application.Top.RemoveAll();
+        Application.Top.Add(view);
+    }
+
     private static void CopyDirectory(string sourceDir, string destinationDir)
     {
+        if (Directory.Exists(destinationDir))
+        {
+            Directory.Delete(destinationDir, true);
+        }
+
         Directory.CreateDirectory(destinationDir);
 
         foreach (var file in Directory.GetFiles(sourceDir))
@@ -430,22 +586,6 @@ internal sealed class InstallerApp
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
     };
-
-    private static string FindWorkspaceRoot()
-    {
-        var current = AppContext.BaseDirectory;
-        while (!string.IsNullOrEmpty(current))
-        {
-            if (File.Exists(Path.Combine(current, "packages.json")))
-            {
-                return current;
-            }
-
-            current = Directory.GetParent(current)?.FullName ?? string.Empty;
-        }
-
-        return Environment.CurrentDirectory;
-    }
 }
 
 internal sealed record GitTag(string Name);
