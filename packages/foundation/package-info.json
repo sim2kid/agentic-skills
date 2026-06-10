@@ -1,0 +1,6 @@
+{
+  "id": "foundation",
+  "name": "Foundation Skills",
+  "description": "Shared foundational skills for artifact readiness, dependency governance, and other cross-cutting studio concerns.",
+  "dependencies": []
+}

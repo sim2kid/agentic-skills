@@ -2,5 +2,5 @@
   "id": "execution-operations",
   "name": "Execution & Operations",
   "description": "The execution and delivery package containing systems design, implementation, QA, and operational coordination agents.",
-  "dependencies": ["core"]
+  "dependencies": ["foundation", "core"]
 }

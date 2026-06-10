@@ -1,19 +1,24 @@
 {
   "packages": [
     {
+      "id": "foundation",
+      "description": "Shared foundational package containing cross-cutting skills used across product, engineering, operations, and support tracks.",
+      "dependencies": []
+    },
+    {
       "id": "core",
       "description": "Core Triad package containing the Product Manager, Lead Engineer, Lead UX/UI Designer, and foundational triad skills.",
-      "dependencies": []
+      "dependencies": ["foundation"]
     },
     {
       "id": "execution-operations",
       "description": "Execution and Operations package containing delivery, architecture, QA, and workflow orchestration agents with supporting skills.",
-      "dependencies": ["core"]
+      "dependencies": ["foundation", "core"]
     },
     {
       "id": "specialized-support",
       "description": "Specialized support package containing DevOps and Security agents for infrastructure, observability, threat modeling, and compliance auditing.",
-      "dependencies": ["core", "execution-operations"]
+      "dependencies": ["foundation", "core", "execution-operations"]
     },
     {
       "id": "example-pkg",

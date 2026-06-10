@@ -5,9 +5,9 @@ license: MIT
 compatibility:
   - opencode
 metadata:
-  owner: project-management
-  package: execution-operations
-  track: operations
+  owner: studio-operations
+  package: foundation
+  scope: shared
 ---
 
 # Artifact Handoff Check
@@ -16,8 +16,9 @@ metadata:
 Prevent downstream waste by verifying that artifacts are complete, internally consistent, and appropriate for the next specialist before handoff.
 
 ## Use This Skill When
-- A PRD, TAD, UX flow, test plan, or defect ticket is about to be routed onward.
+- A PRD, TAD, UX flow, test plan, defect ticket, security report, or deployment artifact is about to be routed onward.
 - Work repeatedly stalls because upstream artifacts are incomplete or ambiguous.
+- A coordinating agent needs to confirm handoff readiness before assigning work.
 
 ## Inputs
 - The artifact to be handed off.
