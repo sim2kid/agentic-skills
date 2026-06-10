@@ -485,7 +485,7 @@ internal sealed class InstallerApp
         if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n)
         {
             args.Handled = true;
-            ActivateButtonByText("_Next");
+            ShowReviewStep();
         }
 
         if (args.KeyEvent.Key == Key.B || args.KeyEvent.Key == Key.b)
@@ -545,7 +545,7 @@ internal sealed class InstallerApp
 
     private void ReviewKeyPress(View.KeyEventEventArgs args)
     {
-        if (args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
+        if (args.KeyEvent.Key == Key.C || args.KeyEvent.Key == Key.c || args.KeyEvent.Key == Key.N || args.KeyEvent.Key == Key.n || args.KeyEvent.Key == Key.Enter)
         {
             args.Handled = true;
             ActivateButtonByText("_Confirm and Install");
@@ -665,29 +665,51 @@ internal sealed class InstallerApp
     {
         _forcedBy.Clear();
 
+        var selectedSet = new HashSet<string>(_selectedPackages, StringComparer.OrdinalIgnoreCase);
+        var dependencyOwners = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var selected in _selectedPackages.ToList())
         {
-            var package = _availablePackages.FirstOrDefault(pkg => string.Equals(pkg.Id, selected, StringComparison.OrdinalIgnoreCase));
-            if (package is null)
+            CollectDependencies(selected, selected, selectedSet, dependencyOwners, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        _selectedPackages = _availablePackages
+            .Where(pkg => selectedSet.Contains(pkg.Id))
+            .Select(pkg => pkg.Id)
+            .ToList();
+
+        foreach (var pair in dependencyOwners)
+        {
+            _forcedBy[pair.Key] = pair.Value;
+        }
+    }
+
+    private void CollectDependencies(string rootPackageId, string currentPackageId, HashSet<string> selectedSet, Dictionary<string, HashSet<string>> dependencyOwners, HashSet<string> visited)
+    {
+        if (!visited.Add(currentPackageId))
+        {
+            return;
+        }
+
+        var package = _availablePackages.FirstOrDefault(pkg => string.Equals(pkg.Id, currentPackageId, StringComparison.OrdinalIgnoreCase));
+        if (package is null)
+        {
+            return;
+        }
+
+        foreach (var dependency in package.Dependencies)
+        {
+            selectedSet.Add(dependency);
+
+            if (!dependencyOwners.TryGetValue(dependency, out var owners))
             {
-                continue;
+                owners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                dependencyOwners[dependency] = owners;
             }
 
-            foreach (var dependency in package.Dependencies)
-            {
-                if (!_selectedPackages.Contains(dependency))
-                {
-                    _selectedPackages.Add(dependency);
-                }
+            owners.Add(rootPackageId);
 
-                if (!_manuallySelectedPackages.Contains(dependency))
-                {
-                    _forcedBy.TryGetValue(dependency, out var forcedBy);
-                    forcedBy ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    _forcedBy[dependency] = forcedBy;
-                    forcedBy.Add(package.Id);
-                }
-            }
+            CollectDependencies(rootPackageId, dependency, selectedSet, dependencyOwners, visited);
         }
     }
 
