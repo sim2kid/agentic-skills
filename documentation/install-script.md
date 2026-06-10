@@ -3,9 +3,9 @@
 The installation script is a robust, single-file utility designed to deploy skills and agents from this repository into a target repository. It supports versioning via GitHub releases and stateful package management.
 
 ## 1. User Experience
-The script is designed for single-command execution on Windows:
+The primary Windows installer is the TUI bootstrap script and is designed for single-command execution:
 ```powershell
-powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "iwr -useb https://raw.githubusercontent.com/OWNER/REPO/main/install-tui.ps1 | iex"
 ```
 
 ## 2. State Management (`packages-installed.json`)
