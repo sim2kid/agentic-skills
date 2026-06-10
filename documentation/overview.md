@@ -14,18 +14,27 @@ The project follows a standardized studio roster to leverage industry-standard b
 
 ### The Core Triad (Conflict Resolution)
 - **Product Manager**: Defines vision, goals, and acceptance criteria.
+    - **Skill**: `product-roadmap-management` (Manages product vision, requirements, and priority queues).
 - **Lead Engineer**: Establishes technical architecture and quality standards.
+    - **Skill**: `technical-governance` (Defines engineering standards, reviews architecture, and manages technical debt).
 - **Lead UX/UI Designer**: Owns the user experience, flow, and visual interface.
+    - **Skill**: `ux-design-system` (Manages design languages, user personas, and accessibility standards).
 
 ### Execution & Operations
 - **Systems Architect**: Designs modular components and interface definitions.
+    - **Skill**: `system-modeling` (Creates UML, ERD, and API specifications).
 - **Senior Software Engineer**: Executes code implementation and localized logic.
+    - **Skill**: `feature-implementation` (Translates technical designs into production-ready code).
 - **QA Lead**: Manages bug triaging, test validation, and change requests.
+    - **Skill**: `quality-assurance-strategy` (Designs test plans, manages bug tracking, and validates acceptance criteria).
 - **Lead Producer**: Orchestrates workflows, routes tasks, and unblocks the team.
+    - **Skill**: `workflow-orchestration` (Manages task dependencies, timelines, and agent coordination).
 
 ### Specialized Support
 - **DevOps Specialist**: Manages deployment, environments, and scalability.
+    - **Skill**: `infrastructure-as-code` (Configures CI/CD pipelines and cloud environment scaling).
 - **Security Auditor**: Conducts passive reviews for vulnerabilities and licensing compliance.
+    - **Skill**: `security-compliance-audit` (Analyzes code for vulnerabilities and ensures license adherence).
 
 ## Repository Structure
 
