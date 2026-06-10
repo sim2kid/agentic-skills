@@ -28,6 +28,7 @@ internal sealed class InstallerApp
     private List<string> _selectedPackages = new();
     private List<PackageDefinition> _availablePackages = new();
     private readonly Dictionary<string, HashSet<string>> _forcedBy = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _manuallySelectedPackages = new(StringComparer.OrdinalIgnoreCase);
     private int _agentTypeIndex;
     private int _versionIndex;
     private int _packagePageIndex;
@@ -309,6 +310,12 @@ internal sealed class InstallerApp
                 : _availablePackages.Select(pkg => pkg.Id).ToList();
         }
 
+        _manuallySelectedPackages.Clear();
+        foreach (var packageId in _selectedPackages)
+        {
+            _manuallySelectedPackages.Add(packageId);
+        }
+
         NormalizeForcedDependencies();
         RenderPackagesPage();
     }
@@ -563,6 +570,11 @@ internal sealed class InstallerApp
     {
         if (_selectedPackages.Contains(packageId))
         {
+            if (_manuallySelectedPackages.Contains(packageId))
+            {
+                _manuallySelectedPackages.Remove(packageId);
+            }
+
             if (_forcedBy.TryGetValue(packageId, out var forcedBy) && forcedBy.Count > 0)
             {
                 MessageBox.ErrorQuery("Dependency Required", $"`{packageId}` is required by: {string.Join(", ", forcedBy.OrderBy(x => x))}", "OK");
@@ -574,6 +586,7 @@ internal sealed class InstallerApp
             return;
         }
 
+        _manuallySelectedPackages.Add(packageId);
         AddPackageWithDependencies(packageId, packageId);
     }
 
@@ -618,7 +631,7 @@ internal sealed class InstallerApp
         foreach (var dependency in autoSelected)
         {
             _forcedBy.Remove(dependency);
-            if (_selectedPackages.Contains(dependency) && !IsRequiredBySelectedPackage(dependency))
+            if (_selectedPackages.Contains(dependency) && !IsRequiredBySelectedPackage(dependency) && !_manuallySelectedPackages.Contains(dependency))
             {
                 _selectedPackages.Remove(dependency);
                 RemoveDependencyForcers(dependency);
@@ -652,13 +665,13 @@ internal sealed class InstallerApp
                     _selectedPackages.Add(dependency);
                 }
 
-                if (!_forcedBy.TryGetValue(dependency, out var forcedBy))
+                if (!_manuallySelectedPackages.Contains(dependency))
                 {
-                    forcedBy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    _forcedBy.TryGetValue(dependency, out var forcedBy);
+                    forcedBy ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     _forcedBy[dependency] = forcedBy;
+                    forcedBy.Add(package.Id);
                 }
-
-                forcedBy.Add(package.Id);
             }
         }
     }
