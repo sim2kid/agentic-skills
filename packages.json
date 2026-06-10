@@ -25,5 +25,10 @@
       "description": "Specialized support package containing DevOps and Security agents for infrastructure, observability, threat modeling, and compliance auditing.",
       "dependencies": ["foundation", "studio-authoring", "core", "execution-operations"]
     },
+    {
+      "id": "git-writing",
+      "description": "Git Writing package containing PR and release notes writers for reviewer-ready and release-ready change communication.",
+      "dependencies": ["foundation", "studio-authoring", "core", "execution-operations"]
+    },
   ]
 }
