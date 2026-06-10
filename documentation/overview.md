@@ -12,6 +12,10 @@ This project aims to create a repository of explicit sub-agents that take on spe
 
 The project follows a standardized studio roster to leverage industry-standard behaviors:
 
+### The Core (Primary Modes + Triad)
+- **Implement**: Primary execution mode that delegates through Core ownership and downstream specialists to complete work.
+- **Design**: Primary planning mode that will own planning-oriented delegation and artifact creation.
+
 ### The Core Triad (Conflict Resolution)
 - **Product Manager**: Defines vision, goals, and acceptance criteria.
     - **Skill**: `product-roadmap-management` (Manages product vision, requirements, and priority queues).

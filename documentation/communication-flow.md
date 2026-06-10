@@ -28,6 +28,7 @@ graph TD
 
 ## Information Flow
 
+0.  **Mode Selection**: A primary Core mode accepts the user request. `Design` handles planning-oriented work; `Implement` handles execution-oriented work.
 1.  **Product Vision**: The **Product Manager** defines the "What" and "Why".
 2.  **Orchestration**: The **Lead Producer** determines the starting point and routes the workflow.
 3.  **Technical Design**: The **Lead Engineer** translates product requirements into high-level technical specifications (TAD).
@@ -49,8 +50,8 @@ When design goals (PM), technical feasibility (LE), and user experience (UX) cla
 - **Infinite Loop Prevention**: The **Lead Producer** monitors the Triad to ensure resolutions are reached and the workflow remains unblocked.
 
 ## Request Lifecycle
-1. **Intake**: PM/QA Lead identifies a requirement or bug.
-2. **Routing**: Lead Producer assigns the task to the appropriate Triad member.
+1. **Intake**: A primary Core mode accepts the request and determines whether it is planning-first or execution-first.
+2. **Routing**: The primary mode routes to the appropriate Triad member or downstream specialist path.
 3. **Review**: Lead Engineer assesses technical impact and sets standards.
 4. **Design**: Systems Architect drafts the interface definitions and appends a **Handoff Summary**.
 5. **Execution**: Senior Software Engineer implements the code.

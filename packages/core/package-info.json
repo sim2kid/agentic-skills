@@ -1,6 +1,6 @@
 {
   "id": "core",
-  "name": "Core Triad",
-  "description": "The foundational package containing the core Triad sub-agents and their reusable collaboration skills.",
+  "name": "Core",
+  "description": "The foundational package containing the core ownership agents, primary operating modes, and reusable collaboration skills.",
   "dependencies": ["foundation", "studio-authoring"]
 }
