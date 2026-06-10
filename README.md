@@ -31,17 +31,21 @@ All definitions follow the [OpenCode](https://opencode.ai/docs/) standards for s
 
 ## Installation
 
-A dedicated install script is provided to deploy these skills into target repositories.
+A TUI-based install script is provided to deploy these skills into target repositories.
 
 **Features:**
 - Explicit package selection.
-- Support for upgrades and rollbacks based on git releases.
+- Support for tags and latest-from-main selection.
 - Cross-device compatibility.
+- Single-window TUI flow with review and confirmation.
+- Ctrl+C exits cleanly.
 
 Run the installation command (Windows):
 ```powershell
 $t = Join-Path $env:TEMP ("agentic-skills-install-tui-$([guid]::NewGuid().ToString('N')).ps1"); Invoke-WebRequest "https://raw.githubusercontent.com/sim2kid/agentic-skills/main/install-tui.ps1" -OutFile $t; & powershell -ExecutionPolicy Bypass -File $t
 ```
+
+The installer downloads the repository archive, extracts the source, and launches the TUI from the extracted project so it can resolve tags, metadata, and package contents from the repo itself.
 
 ## Testing & Validation
 
