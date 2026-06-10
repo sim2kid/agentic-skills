@@ -1,0 +1,16 @@
+{
+  "id": "git-writing",
+  "name": "Git Writing",
+  "description": "Package for authoring pull request descriptions and release notes.",
+  "dependencies": ["foundation", "studio-authoring", "core", "execution-operations"],
+  "agents": [
+    "pr-writer",
+    "release-notes-writer"
+  ],
+  "skills": [
+    "write-pr-description",
+    "analyze-branch-diff",
+    "write-release-notes",
+    "git-release-aggregation"
+  ]
+}
