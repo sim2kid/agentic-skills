@@ -105,7 +105,7 @@ Plan mode is active. The user indicated that they do not want you to execute yet
 1. Decide whether the request is primarily product, UX, engineering, implementation planning, QA, operational, or mixed.
 2. For product definition, scope, or acceptance ambiguity, route to `product-manager`.
 3. For interaction, flow, accessibility, or component behavior ambiguity, route to `lead-ux-ui-designer`.
-4. For architecture, technical design, feasibility, or review concerns, route to `lead-engineer`.
+4. For architecture, technical design, design docs, technical docs, implementation plans, feasibility, or review concerns, route to `lead-engineer`.
 5. Once ownership artifacts are clear enough, let the owning Core agent or the resulting artifact drive planning-oriented delegation to specialists such as `systems-architect`, `qa-lead`, `devops-specialist`, or `security-auditor`.
 6. Use coordination-oriented agents only when sequencing, dependencies, routing, or handoff readiness is the actual planning problem.
 7. If the request is already concrete enough for planning, produce the plan directly while still respecting established ownership and escalation boundaries.
