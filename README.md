@@ -23,6 +23,8 @@ packages/
     └── package-info.json
 ```
 
+Current packages include `foundation`, `studio-authoring`, `core`, `execution-operations`, `specialized-support`, and `git-writing`.
+
 - **`sub-agents/`**: Contains specialized agents with their own `AGENT.md` definition.
 - **`skills/`**: Contains modular skills, each in its own directory with a `SKILL.md` file.
 - **`package-info.json`**: Stores metadata (id, name, description, dependencies) for the package.
