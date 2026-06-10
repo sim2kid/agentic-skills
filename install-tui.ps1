@@ -2,7 +2,22 @@
 
 $repoOwner = "sim2kid"
 $repoName = "agentic-skills"
-$projectPath = Join-Path $PSScriptRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
+
+$scriptRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) { Get-Location } else { $PSScriptRoot }
+$repoRoot = if (Test-Path -LiteralPath (Join-Path $scriptRoot "packages.json")) { $scriptRoot } else {
+    $cwd = Get-Location
+    $check = Join-Path $cwd "packages.json"
+    if (Test-Path -LiteralPath $check) { $cwd } else {
+        while ($cwd) {
+            $check = Join-Path $cwd "packages.json"
+            if (Test-Path -LiteralPath $check) { break }
+            $cwd = Split-Path $cwd -Parent
+        }
+        if (-not $cwd) { throw "Could not find repository root (packages.json not found)" }
+        $cwd
+    }
+}
+$projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
 
 function Show-Welcome {
     Clear-Host
@@ -10,7 +25,7 @@ function Show-Welcome {
     Write-Host "      Agentic Skills TUI Installer      " -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "Target Repo: $repoOwner/$repoName" -ForegroundColor Gray
-    Write-Host "Project: $projectPath" -ForegroundColor Gray
+    Write-Host "Repo Root: $repoRoot" -ForegroundColor Gray
     Write-Host ""
 }
 
