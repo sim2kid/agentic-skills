@@ -25,6 +25,7 @@ function Show-Welcome {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "   Agentic Skills Installation Script   " -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Target Repo: $repoOwner/$repoName" -ForegroundColor Gray
     Write-Host ""
 }
 
