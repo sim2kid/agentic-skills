@@ -3,21 +3,31 @@
 $repoOwner = "sim2kid"
 $repoName = "agentic-skills"
 
-$scriptRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) { Get-Location } else { $PSScriptRoot }
-$repoRoot = if (Test-Path -LiteralPath (Join-Path $scriptRoot "packages.json")) { $scriptRoot } else {
-    $cwd = Get-Location
-    $check = Join-Path $cwd "packages.json"
-    if (Test-Path -LiteralPath $check) { $cwd } else {
-        while ($cwd) {
-            $check = Join-Path $cwd "packages.json"
-            if (Test-Path -LiteralPath $check) { break }
-            $cwd = Split-Path $cwd -Parent
-        }
-        if (-not $cwd) { throw "Could not find repository root (packages.json not found)" }
-        $cwd
+function Get-RepoRoot {
+    $searchRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        (Get-Location).Path
+    } else {
+        $PSScriptRoot
     }
+
+    $checkPath = Join-Path $searchRoot "packages.json"
+    if (Test-Path -LiteralPath $checkPath) {
+        return $searchRoot
+    }
+
+    $parent = Split-Path $searchRoot -Parent
+    while (-not [string]::IsNullOrWhiteSpace($parent)) {
+        $checkPath = Join-Path $parent "packages.json"
+        if (Test-Path -LiteralPath $checkPath) {
+            return $parent
+        }
+        $parent = Split-Path $parent -Parent
+    }
+
+    return $null
 }
-$projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
+
+$repoRoot = Get-RepoRoot
 
 function Show-Welcome {
     Clear-Host
@@ -31,13 +41,20 @@ function Show-Welcome {
 
 Show-Welcome
 
+if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+    Write-Error "Could not find repository root (packages.json not found in any parent directory)."
+    exit 1
+}
+
+$projectPath = Join-Path $repoRoot "install-scripts\tui\AgenticSkillsInstaller\AgenticSkillsInstaller.csproj"
+
 if (-not (Test-Path -LiteralPath $projectPath)) {
-    Write-Error "TUI installer project not found at $projectPath"
+    Write-Error "TUI installer project not found at: $projectPath"
     exit 1
 }
 
 try {
-    Write-Host "Launching TUI installer with dotnet..." -ForegroundColor Yellow
+    Write-Host "Launching TUI installer..." -ForegroundColor Yellow
     dotnet run --project $projectPath
 } catch {
     Write-Error "Failed to launch TUI installer: $($_.Exception.Message)"
