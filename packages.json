@@ -1,6 +1,16 @@
 {
   "packages": [
     {
+      "id": "core",
+      "description": "Core Triad package containing the Product Manager, Lead Engineer, Lead UX/UI Designer, and foundational triad skills.",
+      "dependencies": []
+    },
+    {
+      "id": "execution-operations",
+      "description": "Execution and Operations package containing delivery, architecture, QA, and workflow orchestration agents with supporting skills.",
+      "dependencies": ["core"]
+    },
+    {
       "id": "example-pkg",
       "description": "Example package containing both skill and agent",
       "dependencies": []
